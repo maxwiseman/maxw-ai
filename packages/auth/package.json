@@ -22,25 +22,25 @@
   },
   "dependencies": {
     "@acme/db": "workspace:*",
-    "@auth/core": "0.34.2",
-    "@auth/drizzle-adapter": "1.4.2",
-    "@better-auth/expo": "^1.1.15-beta.7",
-    "@t3-oss/env-nextjs": "^0.11.1",
-    "better-auth": "^1.1.15-beta.7",
-    "next": "^14.2.15",
+    "@auth/core": "0.39.1",
+    "@auth/drizzle-adapter": "1.9.1",
+    "@better-auth/expo": "^1.2.8",
+    "@t3-oss/env-nextjs": "^0.13.6",
+    "better-auth": "^1.2.8",
+    "next": "^15.3.3",
     "next-auth": "5.0.0-beta.20",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "zod": "^3.23.8"
+    "zod": "^3.25.42"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
     "@acme/prettier-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
-    "eslint": "^9.12.0",
-    "prettier": "^3.3.3",
-    "tsup": "^8.3.5",
-    "typescript": "^5.6.3"
+    "eslint": "^9.28.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
   },
   "prettier": "@acme/prettier-config"
 }
