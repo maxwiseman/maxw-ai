@@ -16,10 +16,10 @@ import { env } from "~/env";
 export const metadata: Metadata = {
   metadataBase: new URL(
     env.VERCEL_ENV === "production"
-      ? "https://yig.maxwiseman.io"
+      ? "https://maxw.ai"
       : "http://localhost:3000",
   ),
-  title: "YIG Court Dashboard",
+  title: "Max's AI",
 };
 
 export const viewport: Viewport = {
