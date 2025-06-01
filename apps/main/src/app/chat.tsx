@@ -1,6 +1,7 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
+import type { ChatStatus } from "ai";
 import { createChatStore, useChat } from "@ai-sdk/react";
 import { IconArrowUp, IconSquare } from "@tabler/icons-react";
 
@@ -17,6 +18,11 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from "@acme/ui/prompt-input";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@acme/ui/reasoning";
 import { ScrollButton } from "@acme/ui/scroll-button";
 
 const chatStore = createChatStore({
@@ -111,6 +117,10 @@ Let me know if you want specific styles or combos.
           role: "assistant",
           parts: [
             {
+              type: "reasoning",
+              text: "I thought about it for a while and I think I can do it.",
+            },
+            {
               type: "text",
               text: `**Rainbow Six Siege: A Tactical Revolution in FPS Gaming**
 
@@ -156,7 +166,9 @@ export default function Chat() {
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
+                status={status}
                 message={message}
+                isLatest={message.id === messages[messages.length - 1]?.id}
                 className={cn(
                   message.role === "user" ? "self-end" : "w-full grow",
                 )}
@@ -202,24 +214,51 @@ export default function Chat() {
 
 export function ChatMessage({
   message,
+  status,
+  isLatest,
   className,
 }: {
   message: UIMessage;
+  status: ChatStatus;
+  isLatest: boolean;
   className?: string;
 }) {
   return (
-    <Message className={className}>
-      <MessageContent
-        className={cn(
-          message.role !== "user" &&
-            "w-full rounded-none bg-transparent p-0 px-0",
-        )}
-        markdown
-      >
-        {message.parts
-          .map((part) => (part.type === "text" ? part.text : undefined))
-          .join()}
-      </MessageContent>
+    <Message className={cn(className, "flex-col")}>
+      {message.parts.map((part, partIndex) => {
+        const isGeneratingPart =
+          status === "streaming" &&
+          isLatest &&
+          partIndex === message.parts.length - 1;
+        switch (part.type) {
+          case "reasoning":
+            return (
+              <Reasoning
+                key={partIndex}
+                defaultOpen={false}
+                className="text-muted-foreground"
+              >
+                <ReasoningTrigger>
+                  {isGeneratingPart ? "Thinking..." : "Thought about it"}
+                </ReasoningTrigger>
+                <ReasoningContent>{part.text}</ReasoningContent>
+              </Reasoning>
+            );
+          case "text":
+            return (
+              <MessageContent
+                key={partIndex}
+                className={cn(
+                  message.role !== "user" &&
+                    "w-full rounded-none bg-transparent p-0 px-0",
+                )}
+                markdown
+              >
+                {part.text}
+              </MessageContent>
+            );
+        }
+      })}
     </Message>
   );
 }
