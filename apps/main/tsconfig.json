@@ -5,10 +5,12 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@acme/ui/*": ["../../packages/ui/src/*"]
     },
     "plugins": [{ "name": "next" }],
     "module": "esnext",
+    "moduleResolution": "bundler",
     "types": []
   },
   "include": [".", ".next/types/**/*.ts"],

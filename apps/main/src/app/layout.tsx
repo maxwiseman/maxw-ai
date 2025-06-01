@@ -11,7 +11,10 @@ import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/app/globals.css";
 
+import { SidebarInset, SidebarProvider } from "@acme/ui/sidebar";
+
 import { env } from "~/env";
+import { AppSidebar } from "./app-sidebar";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -40,7 +43,12 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TRPCReactProvider>{props.children}</TRPCReactProvider>
+          <TRPCReactProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              <SidebarInset>{props.children}</SidebarInset>
+            </SidebarProvider>
+          </TRPCReactProvider>
           <div className="absolute right-4 bottom-4">
             <ThemeToggle />
           </div>

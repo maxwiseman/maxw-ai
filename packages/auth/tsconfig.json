@@ -3,8 +3,9 @@
   "compilerOptions": {
     "downlevelIteration": true,
     "useDefineForClassFields": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": []
   },
   "include": ["src", "*.ts"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules"]
 }
