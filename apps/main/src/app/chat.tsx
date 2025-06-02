@@ -2,16 +2,32 @@
 
 import type { UIMessage } from "@ai-sdk/react";
 import type { ChatStatus } from "ai";
+import { useState } from "react";
 import { createChatStore, useChat } from "@ai-sdk/react";
-import { IconArrowUp, IconSquare } from "@tabler/icons-react";
+import { IconExclamationCircle } from "@tabler/icons-react";
+import { DefaultChatTransport } from "ai";
+import {
+  ArrowUp,
+  Check,
+  Copy,
+  Square,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
 
 import { Button } from "@acme/ui/button";
+import { Card, CardContent, CardHeader } from "@acme/ui/card";
 import {
   ChatContainerContent,
   ChatContainerRoot,
 } from "@acme/ui/chat-container";
 import { cn } from "@acme/ui/index";
-import { Message, MessageContent } from "@acme/ui/message";
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+} from "@acme/ui/message";
 import {
   PromptInput,
   PromptInputAction,
@@ -140,23 +156,17 @@ Since its 2015 launch, *Siege* has evolved with frequent updates, new operators,
       ],
     },
   },
-  transport: {
-    submitMessages: async (messages) => {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        body: JSON.stringify(messages),
-      });
-      return response.json();
-    },
-  },
+  transport: new DefaultChatTransport({ api: "/api/chat" }),
 });
 
-export default function Chat() {
-  const { messages, handleSubmit, stop, setInput, input, status } = useChat({
-    chatStore: chatStore,
-    chatId: "1",
-  });
+export default function Chat({ chatId }: { chatId?: string }) {
+  const { messages, handleSubmit, stop, setInput, input, status, error } =
+    useChat({
+      chatStore: chatStore,
+      chatId: chatId ?? "1",
+    });
   const canSubmit = status === "ready" || status === "error";
+  console.log(messages);
 
   return (
     <div className="absolute inset-0 h-full max-h-full overflow-hidden">
@@ -174,11 +184,24 @@ export default function Chat() {
                 )}
               />
             ))}
+            {error && (
+              <Card className="border-amber-500/70 bg-amber-500/10 text-amber-500 shadow-none">
+                <CardHeader className="flex flex-row items-center gap-2 p-4 pb-0 text-lg font-medium">
+                  <IconExclamationCircle />
+                  {error.message}
+                </CardHeader>
+                <CardContent className="p-4 pt-2 text-sm">
+                  {typeof error.cause === "string"
+                    ? error.cause
+                    : "We're sorry, but something went wrong."}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </ChatContainerContent>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 m-4 flex flex-col items-center justify-center gap-2 [&>*]:pointer-events-auto">
-          <ScrollButton />
+          <ScrollButton className="size-9" />
           <PromptInput
             value={input}
             onValueChange={setInput}
@@ -198,9 +221,9 @@ export default function Chat() {
                   onClick={handleSubmit}
                 >
                   {canSubmit ? (
-                    <IconArrowUp className="size-5" />
+                    <ArrowUp className="!size-5" />
                   ) : (
-                    <IconSquare className="size-5 fill-current" />
+                    <Square className="!size-5 fill-current" />
                   )}
                 </Button>
               </PromptInputAction>
@@ -223,8 +246,17 @@ export function ChatMessage({
   isLatest: boolean;
   className?: string;
 }) {
+  const [copied, setCopied] = useState(false);
+  const [likeStatus, setLikeStatus] = useState<"liked" | "disliked" | "none">(
+    "none",
+  );
+
   return (
-    <Message className={cn(className, "flex-col")}>
+    <Message
+      className={cn(className, "flex-col", {
+        "max-w-[90%]": message.role === "user",
+      })}
+    >
       {message.parts.map((part, partIndex) => {
         const isGeneratingPart =
           status === "streaming" &&
@@ -241,7 +273,10 @@ export function ChatMessage({
                 <ReasoningTrigger>
                   {isGeneratingPart ? "Thinking..." : "Thought about it"}
                 </ReasoningTrigger>
-                <ReasoningContent>{part.text}</ReasoningContent>
+                <ReasoningContent>
+                  {part.text}
+                  {isGeneratingPart && "●"}
+                </ReasoningContent>
               </Reasoning>
             );
           case "text":
@@ -259,6 +294,63 @@ export function ChatMessage({
             );
         }
       })}
+      {message.role === "assistant" && (
+        <MessageActions>
+          <MessageAction tooltip="Copy message">
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  message.parts.find((part) => part.type === "text")?.text ||
+                    "",
+                );
+                setCopied(true);
+                setTimeout(() => {
+                  setCopied(false);
+                }, 3000);
+              }}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              {copied ? (
+                <Check className={`!size-4`} />
+              ) : (
+                <Copy className={`!size-4`} />
+              )}
+            </Button>
+          </MessageAction>
+          <MessageAction tooltip="Like message">
+            <Button
+              onClick={() =>
+                setLikeStatus(likeStatus === "liked" ? "none" : "liked")
+              }
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              <ThumbsUp
+                fill={likeStatus === "liked" ? "currentColor" : "none"}
+                className={`!size-4`}
+              />
+            </Button>
+          </MessageAction>
+          <MessageAction tooltip="Dislike message">
+            <Button
+              onClick={() =>
+                setLikeStatus(likeStatus === "disliked" ? "none" : "disliked")
+              }
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              <ThumbsDown
+                fill={likeStatus === "disliked" ? "currentColor" : "none"}
+                className={`!size-4`}
+              />
+            </Button>
+          </MessageAction>
+        </MessageActions>
+      )}
     </Message>
   );
 }
