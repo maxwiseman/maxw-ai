@@ -7,7 +7,7 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 import { cn } from ".";
-import { CodeBlock, CodeBlockCode } from "./code-block";
+import { CodeBlockCode } from "./code-block";
 
 export interface MarkdownProps {
   children: string;

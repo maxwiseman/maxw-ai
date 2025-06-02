@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { IconBrandSpeedtest } from "@tabler/icons-react";
+import {
+  ArrowUpRight,
+  Ellipsis,
+  ExternalLink,
+  Gauge,
+  Plane,
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -8,11 +15,25 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
 
 export function AppSidebar() {
+  const externalLinks = [
+    {
+      href: "https://rapidgrader.maxw.ai",
+      label: "RapidGrader",
+      icon: Gauge,
+    },
+    {
+      href: "https://autopilot.maxw.ai",
+      label: "AutoPilot",
+      icon: Plane,
+    },
+  ];
+
   return (
     <Sidebar variant="inset">
       <SidebarHeader>
@@ -22,28 +43,52 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton isActive>
-              <IconBrandSpeedtest />
-              RapidGrader
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton>
-              <IconBrandSpeedtest />
-              Edgenuity
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {externalLinks.map((externalLink) => (
+            <Link
+              href={externalLink.href}
+              target="_blank"
+              key={externalLink.href}
+              tabIndex={-1}
+            >
+              <SidebarMenuItem>
+                <SidebarMenuButton>
+                  <externalLink.icon />
+                  {externalLink.label}
+                </SidebarMenuButton>
+                <SidebarMenuAction
+                  className="pointer-events-none"
+                  showOnHover
+                  tabIndex={-1}
+                >
+                  <ArrowUpRight />
+                </SidebarMenuAction>
+              </SidebarMenuItem>
+            </Link>
+          ))}
         </SidebarMenu>
         <SidebarGroup>
-          <SidebarGroupLabel>Hello</SidebarGroupLabel>
+          <SidebarGroupLabel>Today</SidebarGroupLabel>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton>
-                <IconBrandSpeedtest />
-                Edgenuity
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Link href="/chats/1" tabIndex={-1}>
+              <SidebarMenuItem>
+                <SidebarMenuButton className="line-clamp-1 break-all">
+                  Conversation about the meaning of life
+                </SidebarMenuButton>
+                <SidebarMenuAction showOnHover>
+                  <Ellipsis />
+                </SidebarMenuAction>
+              </SidebarMenuItem>
+            </Link>
+            <Link href="/chats/2" tabIndex={-1}>
+              <SidebarMenuItem>
+                <SidebarMenuButton className="line-clamp-1 break-all">
+                  New chat
+                </SidebarMenuButton>
+                <SidebarMenuAction showOnHover>
+                  <Ellipsis />
+                </SidebarMenuAction>
+              </SidebarMenuItem>
+            </Link>
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
