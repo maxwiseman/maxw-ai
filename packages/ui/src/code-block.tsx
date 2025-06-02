@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { IconCheck, IconCopy } from "@tabler/icons-react";
+import { useTheme } from "next-themes";
 import { codeToHtml } from "shiki";
 
 import { cn } from ".";
@@ -37,12 +38,13 @@ export type CodeBlockCodeProps = {
 function CodeBlockCode({
   code,
   language = "tsx",
-  theme = "github-light",
+  theme,
   className,
   ...props
 }: CodeBlockCodeProps) {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     async function highlight() {
@@ -51,19 +53,21 @@ function CodeBlockCode({
         return;
       }
 
-      const html = await codeToHtml(code, { lang: language, theme });
+      const html = await codeToHtml(code, {
+        lang: language,
+        theme: theme ?? `github-${resolvedTheme}`,
+      });
       setHighlightedHtml(html);
     }
     highlight().catch(console.error);
-  }, [code, language, theme]);
+  }, [code, language, theme, resolvedTheme]);
 
   const classNames = cn(
     "w-full overflow-x-auto text-[13px] [&>pre]:px-4 [&>pre]:py-4",
     className,
   );
 
-  // SSR fallback: render plain code if not hydrated yet
-  return highlightedHtml ? (
+  return (
     <div className="bg-secondary rounded-xl">
       <div className="text-foreground/50 flex items-center justify-between p-0.5 font-mono text-sm">
         <div className="relative top-0.5 p-1 px-3">{language}</div>
@@ -76,7 +80,7 @@ function CodeBlockCode({
               .write([
                 new ClipboardItem({
                   "text/plain": code,
-                  "text/html": new Blob([highlightedHtml], {
+                  "text/html": new Blob([highlightedHtml ?? code], {
                     type: "text/html",
                   }),
                 }),
@@ -103,27 +107,15 @@ function CodeBlockCode({
         )}
         {...props}
       >
-        <div
-          className={classNames}
-          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-          {...props}
-        />
-      </div>
-    </div>
-  ) : (
-    <div>
-      {language}
-      <div
-        className={cn(
-          "not-prose flex w-full flex-col overflow-clip border",
-          "border-border bg-card text-card-foreground rounded-xl",
-          className,
+        {highlightedHtml ? (
+          <div
+            className={cn("[&>*]:!bg-transparent", classNames)}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            {...props}
+          />
+        ) : (
+          code
         )}
-        {...props}
-      >
-        <pre>
-          <code>{code}</code>
-        </pre>
       </div>
     </div>
   );

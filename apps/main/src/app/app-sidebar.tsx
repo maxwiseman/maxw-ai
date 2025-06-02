@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { IconBrandSpeedtest } from "@tabler/icons-react";
 
 import {
@@ -14,7 +15,11 @@ import {
 export function AppSidebar() {
   return (
     <Sidebar variant="inset">
-      <SidebarHeader>Hi</SidebarHeader>
+      <SidebarHeader>
+        <Link href="/" className="mb-4 font-mono text-2xl font-bold">
+          maxw.ai
+        </Link>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>

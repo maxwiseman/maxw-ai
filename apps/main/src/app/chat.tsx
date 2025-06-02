@@ -162,7 +162,7 @@ export default function Chat() {
     <div className="absolute inset-0 h-full max-h-full overflow-hidden">
       <ChatContainerRoot className="absolute inset-0 overflow-scroll">
         <ChatContainerContent>
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 pt-8 pb-64">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-8 pb-64 sm:px-8 lg:px-16">
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
