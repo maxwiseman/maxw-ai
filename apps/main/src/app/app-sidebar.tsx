@@ -1,16 +1,11 @@
 import Link from "next/link";
-import { IconBrandSpeedtest } from "@tabler/icons-react";
-import {
-  ArrowUpRight,
-  Ellipsis,
-  ExternalLink,
-  Gauge,
-  Plane,
-} from "lucide-react";
+import { ArrowUpRight, Ellipsis, Gauge, Plane } from "lucide-react";
 
+import { Button } from "@acme/ui/button";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -19,6 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
+
+import { AuthButton, AuthModal } from "./auth-modal";
 
 export function AppSidebar() {
   const externalLinks = [
@@ -92,6 +89,9 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <AuthButton />
+      </SidebarFooter>
     </Sidebar>
   );
 }

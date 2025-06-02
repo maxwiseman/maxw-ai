@@ -30,7 +30,7 @@ const PromptInputContext = createContext<PromptInputContextType>({
   isLoading: false,
   value: "",
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  setValue: () => { },
+  setValue: () => {},
   maxHeight: 240,
   onSubmit: undefined,
   disabled: false,
@@ -84,11 +84,18 @@ function PromptInput({
       >
         <div
           className={cn(
-            "border-input bg-background rounded-3xl border p-2 shadow-xs",
+            "bg-background w-full max-w-max rounded-3xl",
             className,
           )}
         >
-          {children}
+          <div
+            className={cn(
+              "border-input dark:bg-input/30 rounded-3xl border p-2 shadow-xs",
+              className,
+            )}
+          >
+            {children}
+          </div>
         </div>
       </PromptInputContext.Provider>
     </TooltipProvider>
@@ -134,7 +141,7 @@ function PromptInputTextarea({
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       className={cn(
-        "text-primary min-h-[44px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+        "text-primary min-h-[44px] w-full resize-none border-none !bg-transparent shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
         className,
       )}
       rows={1}

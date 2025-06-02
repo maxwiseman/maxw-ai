@@ -11,12 +11,12 @@ import {
   Check,
   Copy,
   MessageCircleDashed,
-  MessagesSquare,
   Square,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
 import { marked } from "marked";
+import { motion } from "motion/react";
 
 import { Button } from "@acme/ui/button";
 import { Card, CardContent, CardHeader } from "@acme/ui/card";
@@ -43,6 +43,8 @@ import {
   ReasoningTrigger,
 } from "@acme/ui/reasoning";
 import { ScrollButton } from "@acme/ui/scroll-button";
+
+import { blurTransition } from "~/lib/transitions";
 
 const chatStore = createChatStore({
   maxSteps: 5,
@@ -194,17 +196,19 @@ export default function Chat({ chatId }: { chatId?: string }) {
               </div>
             )}
             {error && (
-              <Card className="border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-none">
-                <CardHeader className="flex flex-row items-center gap-2 p-4 pb-0 text-lg font-medium">
-                  <IconExclamationCircle />
-                  {error.message}
-                </CardHeader>
-                <CardContent className="p-4 pt-2 text-sm">
-                  {typeof error.cause === "string"
-                    ? error.cause
-                    : "We're sorry, but something went wrong."}
-                </CardContent>
-              </Card>
+              <motion.div {...blurTransition}>
+                <Card className="border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-none">
+                  <CardHeader className="flex flex-row items-center gap-2 p-4 pb-0 text-lg font-medium">
+                    <IconExclamationCircle />
+                    {error.message}
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 text-sm">
+                    {typeof error.cause === "string"
+                      ? error.cause
+                      : "We're sorry, but something went wrong."}
+                  </CardContent>
+                </Card>
+              </motion.div>
             )}
           </div>
         </ChatContainerContent>
