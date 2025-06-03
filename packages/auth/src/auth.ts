@@ -25,7 +25,14 @@ export const config = {
       redirectURI: "http://localhost:3000/api/auth/callback/discord",
     },
   },
-  trustedOrigins: ["exp://"],
+  trustedOrigins: [
+    "exp://",
+    env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "",
+    env.VERCEL_BRANCH_URL ? `https://${env.VERCEL_BRANCH_URL}` : "",
+    env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "",
+  ],
 } satisfies BetterAuthOptions;
 
 export const auth = betterAuth(config);
