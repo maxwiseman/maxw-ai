@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Ellipsis, Gauge, Plane } from "lucide-react";
 
-import { Button } from "@acme/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +14,7 @@ import {
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
 
-import { AuthButton, AuthModal } from "./auth-modal";
+import { AuthButton } from "./auth-modal";
 
 export function AppSidebar() {
   const externalLinks = [

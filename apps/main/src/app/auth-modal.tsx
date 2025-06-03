@@ -6,6 +6,7 @@ import { LogOut, Moon, UserIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { authClient } from "@acme/auth/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@acme/ui/avatar";
 import { Button } from "@acme/ui/button";
 import { GithubIcon } from "@acme/ui/custom-icons";
 import {
@@ -141,9 +142,24 @@ export function AuthButton() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild className="w-full">
-          <Button className="w-full">
-            <UserIcon />
-            {authData.data.user.name}
+          <Button
+            variant="ghost"
+            className="flex h-max w-full justify-start gap-2 px-2"
+          >
+            <Avatar>
+              <AvatarImage src={authData.data.user.image ?? ""} />
+              <AvatarFallback>
+                {authData.data.user.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col text-left">
+              <div className="text-md line-clamp-1 font-semibold">
+                {authData.data.user.name}
+              </div>
+              <div className="text-muted-foreground line-clamp-1 text-sm">
+                {authData.data.user.email}
+              </div>
+            </div>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-42" align="end" side="right">
