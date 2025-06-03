@@ -31,6 +31,7 @@ import {
 } from "@acme/ui/dropdown-menu";
 import { Input } from "@acme/ui/input";
 import { Separator } from "@acme/ui/separator";
+import { Skeleton } from "@acme/ui/skeleton";
 
 export function AuthModal({ children }: { children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -138,6 +139,9 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
 export function AuthButton() {
   const { theme, setTheme } = useTheme();
   const authData = authClient.useSession();
+  if (authData.isPending) {
+    return <Skeleton className="h-14 w-full" />;
+  }
   if (authData.data?.user) {
     return (
       <DropdownMenu>

@@ -148,6 +148,17 @@
   [role="button"]:not([disabled]) {
     cursor: pointer;
   }
+  .animate-reasoning {
+    animation: reasoning 1.5s linear infinite;
+  }
+  @keyframes reasoning {
+    0% {
+      background-position: 200% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
 }
 
 @layer base {

@@ -3,6 +3,7 @@ import { gateway } from "@vercel/ai-sdk-gateway";
 import {
   convertToModelMessages,
   extractReasoningMiddleware,
+  smoothStream,
   streamText,
   wrapLanguageModel,
 } from "ai";
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
       model: gateway("groq/deepseek-r1-distill-llama-70b"),
       middleware: extractReasoningMiddleware({ tagName: "think" }),
     }),
+    experimental_transform: smoothStream({ delayInMs: 20, chunking: "word" }),
     messages: convertToModelMessages(data.messages),
     onFinish: (message) => {
       console.log("Generated: ", message);

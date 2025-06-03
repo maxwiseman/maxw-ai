@@ -17,6 +17,7 @@ import { useTextStream } from "./response-stream";
 interface ReasoningContextType {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  generating?: boolean;
 }
 
 const ReasoningContext = createContext<ReasoningContextType | undefined>(
@@ -39,18 +40,23 @@ export interface ReasoningProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   defaultOpen?: boolean;
+  generating?: boolean;
 }
 
 function Reasoning({
   children,
   className,
   open,
+  generating = false,
   onOpenChange,
   defaultOpen = true,
 }: ReasoningProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
+  useEffect(() => {
+    setInternalOpen(generating);
+  }, [generating]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!isControlled) {
@@ -64,6 +70,7 @@ function Reasoning({
       value={{
         isOpen,
         onOpenChange: handleOpenChange,
+        generating,
       }}
     >
       <div className={className}>{children}</div>
@@ -81,22 +88,29 @@ function ReasoningTrigger({
   className,
   ...props
 }: ReasoningTriggerProps) {
-  const { isOpen, onOpenChange } = useReasoningContext();
+  const { isOpen, onOpenChange, generating } = useReasoningContext();
 
   return (
     <button
       className={cn(
-        "hover:text-primary text-muted-foreground flex cursor-pointer items-center gap-2 transition-[color,font-weight]",
-        { "font-medium": isOpen },
+        "hover:text-primary text-muted-foreground group flex cursor-pointer items-center gap-2 !bg-clip-text transition-[color,font-weight,opacity]",
+        // { "font-medium": isOpen },
+        {
+          "animate-reasoning !bg-[length:200%] text-transparent": generating,
+        },
         className,
       )}
+      style={{
+        background:
+          "linear-gradient(90deg, var(--muted-foreground) 25%, var(--foreground)  50%, var(--muted-foreground) 75%)",
+      }}
       onClick={() => onOpenChange(!isOpen)}
       {...props}
     >
       <span>{children}</span>
       <div
         className={cn(
-          "transform transition-transform",
+          "text-muted-foreground group-hover:text-primary transition-[color,rotate]",
           isOpen ? "rotate-180" : "",
         )}
       >
@@ -118,9 +132,10 @@ function ReasoningContent({
 }: ReasoningContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const { isOpen } = useReasoningContext();
+  const { isOpen, generating } = useReasoningContext();
 
   useEffect(() => {
+    if (generating) return;
     if (!contentRef.current || !innerRef.current) return;
 
     const observer = new ResizeObserver(() => {
@@ -136,22 +151,28 @@ function ReasoningContent({
     }
 
     return () => observer.disconnect();
-  }, [isOpen]);
+  }, [isOpen, generating]);
 
   return (
     <div
-      ref={contentRef}
+      ref={generating ? null : contentRef}
       className={cn(
         "overflow-hidden transition-[max-height,margin-top,margin-bottom] duration-300 ease-out",
-        { "mt-2 mb-6": isOpen },
+        // { "pt-2 pb-6": isOpen },
         className,
       )}
       style={{
-        maxHeight: isOpen ? contentRef.current?.scrollHeight : "0px",
+        maxHeight: isOpen
+          ? generating
+            ? "auto"
+            : contentRef.current?.scrollHeight
+          : "0px",
       }}
       {...props}
     >
-      <div ref={innerRef}>{children}</div>
+      <div className="pt-2 pb-6" ref={generating ? null : innerRef}>
+        {children}
+      </div>
     </div>
   );
 }

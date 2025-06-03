@@ -277,21 +277,23 @@ export function ChatMessage({
           partIndex === message.parts.length - 1;
         switch (part.type) {
           case "reasoning":
-            return (
-              <Reasoning
-                key={partIndex}
-                defaultOpen={false}
-                className="text-muted-foreground"
-              >
-                <ReasoningTrigger>
-                  {isGeneratingPart ? "Thinking..." : "Thought about it"}
-                </ReasoningTrigger>
-                <ReasoningContent>
-                  {part.text}
-                  {isGeneratingPart && "●"}
-                </ReasoningContent>
-              </Reasoning>
-            );
+            if (part.text.trim() !== "")
+              return (
+                <Reasoning
+                  key={partIndex}
+                  generating={isGeneratingPart}
+                  className="text-muted-foreground"
+                >
+                  <ReasoningTrigger>
+                    {isGeneratingPart ? "Thinking..." : "Thought about it"}
+                  </ReasoningTrigger>
+                  <ReasoningContent>
+                    {part.text}
+                    {isGeneratingPart && "●"}
+                  </ReasoningContent>
+                </Reasoning>
+              );
+            return null;
           case "text":
             return (
               <MessageContent
