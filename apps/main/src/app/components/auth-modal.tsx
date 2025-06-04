@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import { LogOut, Moon, UserIcon } from "lucide-react";
+import { LogOut, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { authClient } from "@acme/auth/client";
@@ -42,6 +42,40 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
 
+  async function handleKeyPress(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      await handleSubmit();
+    }
+  }
+  async function handleSubmit() {
+    setIsLoading(true);
+    if (mode === "sign-in") {
+      const data = await authClient.signIn.email({
+        email,
+        password,
+      });
+      if (data.error) {
+        setError(data.error.message);
+      }
+      if (data.data?.user) {
+        setOpen(false);
+      }
+    } else {
+      const data = await authClient.signUp.email({
+        name,
+        email,
+        password,
+      });
+      if (data.error) {
+        setError(data.error.message);
+      }
+      if (data.data?.user) {
+        setOpen(false);
+      }
+    }
+    setIsLoading(false);
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -54,6 +88,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
           <div className="flex flex-col gap-4">
             {mode === "sign-up" && (
               <Input
+                onKeyDown={handleKeyPress}
                 disabled={isLoading}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -62,6 +97,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
               />
             )}
             <Input
+              onKeyDown={handleKeyPress}
               disabled={isLoading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -69,6 +105,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
               placeholder="Email"
             />
             <Input
+              onKeyDown={handleKeyPress}
               disabled={isLoading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -97,37 +134,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
           >
             Sign {mode === "sign-in" ? "up" : "in"}
           </Button>
-          <Button
-            disabled={isLoading}
-            onClick={async () => {
-              setIsLoading(true);
-              if (mode === "sign-in") {
-                const data = await authClient.signIn.email({
-                  email,
-                  password,
-                });
-                if (data.error) {
-                  setError(data.error.message);
-                }
-                if (data.data?.user) {
-                  setOpen(false);
-                }
-              } else {
-                const data = await authClient.signUp.email({
-                  name,
-                  email,
-                  password,
-                });
-                if (data.error) {
-                  setError(data.error.message);
-                }
-                if (data.data?.user) {
-                  setOpen(false);
-                }
-              }
-              setIsLoading(false);
-            }}
-          >
+          <Button disabled={isLoading} onClick={handleSubmit}>
             Sign {mode === "sign-in" ? "in" : "up"}
           </Button>
         </DialogFooter>

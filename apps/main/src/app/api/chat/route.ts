@@ -1,3 +1,4 @@
+import type { UIMessage } from "ai";
 import { headers } from "next/headers";
 import { gateway } from "@vercel/ai-sdk-gateway";
 import {

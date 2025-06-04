@@ -33,6 +33,11 @@ export const config = {
     env.VERCEL_BRANCH_URL ? `https://${env.VERCEL_BRANCH_URL}` : "",
     env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "",
   ],
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+    },
+  },
 } satisfies BetterAuthOptions;
 
 export const auth = betterAuth(config);

@@ -15,6 +15,7 @@ import { SidebarInset, SidebarProvider } from "@acme/ui/sidebar";
 
 import { env } from "~/env";
 import { AppSidebar } from "./app-sidebar";
+import { QueryClientProvider } from "./components/query-client";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -44,10 +45,12 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TRPCReactProvider>
-            <SidebarProvider>
-              <AppSidebar />
-              <SidebarInset>{props.children}</SidebarInset>
-            </SidebarProvider>
+            <QueryClientProvider>
+              <SidebarProvider>
+                <AppSidebar />
+                <SidebarInset>{props.children}</SidebarInset>
+              </SidebarProvider>
+            </QueryClientProvider>
           </TRPCReactProvider>
           <div className="absolute right-4 bottom-4">
             <ThemeToggle />

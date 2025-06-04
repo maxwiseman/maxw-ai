@@ -14,7 +14,8 @@ import {
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
 
-import { AuthButton } from "./auth-modal";
+import { AuthButton } from "./components/auth-modal";
+import { SidebarChats } from "./components/sidebar-chats";
 
 export function AppSidebar() {
   const externalLinks = [
@@ -62,31 +63,7 @@ export function AppSidebar() {
             </Link>
           ))}
         </SidebarMenu>
-        <SidebarGroup>
-          <SidebarGroupLabel>Today</SidebarGroupLabel>
-          <SidebarMenu>
-            <Link href="/chats/1" tabIndex={-1}>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="line-clamp-1 break-all">
-                  Conversation about the meaning of life
-                </SidebarMenuButton>
-                <SidebarMenuAction showOnHover>
-                  <Ellipsis />
-                </SidebarMenuAction>
-              </SidebarMenuItem>
-            </Link>
-            <Link href="/chats/2" tabIndex={-1}>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="line-clamp-1 break-all">
-                  New chat
-                </SidebarMenuButton>
-                <SidebarMenuAction showOnHover>
-                  <Ellipsis />
-                </SidebarMenuAction>
-              </SidebarMenuItem>
-            </Link>
-          </SidebarMenu>
-        </SidebarGroup>
+        <SidebarChats />
       </SidebarContent>
       <SidebarFooter>
         <AuthButton />

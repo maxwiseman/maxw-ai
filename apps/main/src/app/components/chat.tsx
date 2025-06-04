@@ -1,10 +1,11 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
-import type { ChatStatus } from "ai";
-import { useState } from "react";
+import type { ChatStatus, ChatStore } from "ai";
+import { useEffect, useState } from "react";
 import { createChatStore, useChat } from "@ai-sdk/react";
 import { IconExclamationCircle } from "@tabler/icons-react";
+import { useQuery } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import {
   ArrowUp,
@@ -45,126 +46,36 @@ import {
 import { ScrollButton } from "@acme/ui/scroll-button";
 
 import { blurTransition } from "~/lib/transitions";
+import { getChats } from "./chat-actions";
 
-const chatStore = createChatStore({
-  maxSteps: 5,
-  chats: {
-    "1": {
-      messages: [
-        {
-          id: "1",
-          role: "user",
-          parts: [{ type: "text", text: "Hello, how are you?" }],
-        },
-        {
-          id: "2",
-          role: "assistant",
-          parts: [
-            {
-              type: "text",
-              text: "I am doing very well. How about `you`?",
-            },
-          ],
-        },
-        {
-          id: "3",
-          role: "user",
-          parts: [
-            {
-              type: "text",
-              text: "Could you show me some markdown formatting?",
-            },
-          ],
-        },
-        {
-          id: "4",
-          role: "assistant",
-          parts: [
-            {
-              type: "text",
-              text: `Sure thing:
+export function useChatStore() {
+  const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
+  const defaultChatStore = createChatStore({
+    maxSteps: 5,
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
+  });
 
-# Heading 1
-
-## Heading 2
-
-### Heading 3
-
-**Bold**
-*Italic*
-***Bold + Italic***
-~~Strikethrough~~
-
-> Blockquote
-> Still part of the quote
-
-* Bullet list item 1
-* Bullet list item 2
-
-  * Nested item
-
-1. Numbered item 1
-2. Numbered item 2
-
-\`Inline code\`
-
-\`\`\`tsx
-<div>
-  <h1>Hello, world!</h1>
-</div>
-\`\`\`
-
-[Link to OpenAI](https://openai.com)
-
-| Column A | Column B |
-| -------- | -------- |
-| Row 1    | Value 1  |
-| Row 2    | Value 2  |
-
----
-
-Let me know if you want specific styles or combos.
-`,
-            },
-          ],
-        },
-        {
-          id: "5",
-          role: "user",
-          parts: [{ type: "text", text: "Write an essay for me." }],
-        },
-        {
-          id: "6",
-          role: "assistant",
-          parts: [
-            {
-              type: "reasoning",
-              text: "I thought about it for a while and I think I can do it.",
-            },
-            {
-              type: "text",
-              text: `**Rainbow Six Siege: A Tactical Revolution in FPS Gaming**
-
-*Tom Clancy’s Rainbow Six Siege* is a competitive first-person shooter that stands out for its emphasis on strategy, teamwork, and destruction-based gameplay. Unlike most run-and-gun shooters, *Siege* forces players to think like operators—planning, coordinating, and adapting in real time.
-
-At its core, *Siege* pits two teams against each other: attackers and defenders. Each player chooses a unique operator with specific gadgets that shape the game’s tactical flow. Attackers might use drones, hard breaching tools, or smokescreens, while defenders set traps, reinforce walls, or gather intel. This asymmetric design creates a chess-like tension where every decision counts.
-
-A major innovation in *Siege* is its destructible environments. Players can breach walls, floors, and ceilings to gain new lines of sight or surprise enemies. This dynamic map interaction adds depth, rewarding creativity and map knowledge over pure reflexes.
-
-The game also thrives on communication. Solo play is possible, but coordinated teams dominate. Whether it’s a well-timed breach or a clutch 1v3 defense, the best moments in *Siege* come from teamwork and smart plays, not just aim.
-
-Since its 2015 launch, *Siege* has evolved with frequent updates, new operators, and reworked maps. Despite its steep learning curve, its depth keeps players hooked. For those looking for a tactical, high-stakes shooter that rewards brains as much as brawn, *Rainbow Six Siege* delivers like no other.
-`,
-            },
-          ],
-        },
-      ],
-    },
-  },
-  transport: new DefaultChatTransport({ api: "/api/chat" }),
-});
+  const [store, setStore] = useState<ChatStore>(defaultChatStore);
+  useEffect(() => {
+    if (chatFetch.data) {
+      const transformedChats =
+        chatFetch.data !== "Unauthorized"
+          ? Object.fromEntries(chatFetch.data.map((item) => [item.id, item]))
+          : undefined;
+      setStore(
+        createChatStore({
+          maxSteps: 5,
+          chats: transformedChats,
+          transport: new DefaultChatTransport({ api: "/api/chat" }),
+        }),
+      );
+    }
+  }, [chatFetch.data]);
+  return { chatStore: store };
+}
 
 export default function Chat({ chatId }: { chatId?: string }) {
+  const { chatStore } = useChatStore();
   const { messages, handleSubmit, stop, setInput, input, status, error } =
     useChat({
       chatStore: chatStore,
