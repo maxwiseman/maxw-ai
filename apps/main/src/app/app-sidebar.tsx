@@ -32,7 +32,11 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset">
       <SidebarHeader>
-        <Link href="/" className="mb-4 font-mono text-2xl font-bold">
+        <Link
+          prefetch={true}
+          href="/"
+          className="mb-4 font-mono text-2xl font-bold"
+        >
           maxw.ai
         </Link>
       </SidebarHeader>

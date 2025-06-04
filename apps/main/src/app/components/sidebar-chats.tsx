@@ -67,7 +67,12 @@ function SidebarChatsDynamic() {
           <SidebarGroupLabel>Today</SidebarGroupLabel>
           <SidebarMenu>
             {categorizedChats.today.map((chat) => (
-              <Link key={chat.id} href={`/chats/${chat.id}`} tabIndex={-1}>
+              <Link
+                prefetch={true}
+                key={chat.id}
+                href={`/chats/${chat.id}`}
+                tabIndex={-1}
+              >
                 <SidebarMenuItem>
                   <SidebarMenuButton className="line-clamp-1 break-all">
                     {chat.name}
@@ -87,7 +92,12 @@ function SidebarChatsDynamic() {
           <SidebarGroupLabel>Last 7 Days</SidebarGroupLabel>
           <SidebarMenu>
             {categorizedChats.last7Days.map((chat) => (
-              <Link key={chat.id} href={`/chats/${chat.id}`} tabIndex={-1}>
+              <Link
+                prefetch={true}
+                key={chat.id}
+                href={`/chats/${chat.id}`}
+                tabIndex={-1}
+              >
                 <SidebarMenuItem>
                   <SidebarMenuButton className="line-clamp-1 break-all">
                     {chat.name}
@@ -107,7 +117,12 @@ function SidebarChatsDynamic() {
           <SidebarGroupLabel>Last 30 Days</SidebarGroupLabel>
           <SidebarMenu>
             {categorizedChats.last30Days.map((chat) => (
-              <Link key={chat.id} href={`/chats/${chat.id}`} tabIndex={-1}>
+              <Link
+                prefetch={true}
+                key={chat.id}
+                href={`/chats/${chat.id}`}
+                tabIndex={-1}
+              >
                 <SidebarMenuItem>
                   <SidebarMenuButton className="line-clamp-1 break-all">
                     {chat.name}

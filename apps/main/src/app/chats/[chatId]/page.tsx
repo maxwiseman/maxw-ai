@@ -1,6 +1,6 @@
-"use client";
-
 import { Chat } from "../../components/chat";
+
+export const dynamic = "force-static";
 
 export default function Page() {
   return (
