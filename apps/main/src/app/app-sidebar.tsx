@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight, Ellipsis, Gauge, Plane } from "lucide-react";
+import { ArrowUpRight, Gauge, Plane } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,

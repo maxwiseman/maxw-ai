@@ -38,9 +38,7 @@ export const message = sqliteTable("message", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   parts: text("parts", { mode: "json" }).$type<UIMessage["parts"]>().notNull(),
-  metadata: text("metadata", { mode: "json" })
-    .$type<UIMessage["metadata"]>()
-    .notNull(),
+  metadata: text("metadata", { mode: "json" }).$type<UIMessage["metadata"]>(),
   role: text("role", { mode: "json" }).$type<UIMessage["role"]>().notNull(),
   chatId: text("chat_id")
     .notNull()

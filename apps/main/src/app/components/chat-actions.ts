@@ -15,7 +15,9 @@ export async function getChats() {
   const chats = await db.query.chat.findMany({
     where: eq(chat.userId, authData.user.id),
     with: {
-      messages: true,
+      messages: {
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+      },
     },
   });
   return chats;

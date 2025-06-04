@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { UIDataTypes, UIMessage } from "ai";
 import { headers } from "next/headers";
 import { gateway } from "@vercel/ai-sdk-gateway";
 import {
@@ -10,6 +10,8 @@ import {
 } from "ai";
 
 import { auth } from "@acme/auth";
+import { db } from "@acme/db/client";
+import { message } from "@acme/db/schema";
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -17,8 +19,11 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const data = await req.json();
-  //   console.log(data);
+  const data = (await req.json()) as {
+    chatId: string;
+    messages: UIMessage<unknown, UIDataTypes>[];
+  };
+  console.log("Data: ", data);
 
   const result = streamText({
     model: wrapLanguageModel({
@@ -27,14 +32,23 @@ export async function POST(req: Request) {
     }),
     experimental_transform: smoothStream({ delayInMs: 20, chunking: "word" }),
     messages: convertToModelMessages(data.messages),
-    onFinish: (message) => {
-      console.log("Generated: ", message);
-    },
-    onError: (error) => {
-      console.error(error);
-    },
   });
+
   //   console.log(result);
   //   await result.consumeStream();
-  return result.toUIMessageStreamResponse({ sendReasoning: true });
+  return result.toUIMessageStreamResponse({
+    sendReasoning: true,
+    onFinish: (finishData) => {
+      console.log(finishData.messages);
+      db.insert(message)
+        .values([
+          ...finishData.messages.map((item) => ({
+            ...item,
+            chatId: data.chatId,
+          })),
+        ])
+        .execute()
+        .catch(console.error);
+    },
+  });
 }

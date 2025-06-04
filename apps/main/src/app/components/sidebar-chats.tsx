@@ -28,7 +28,6 @@ function SidebarChatsDynamic() {
   useEffect(() => {
     refetch().catch(console.error);
   }, [authData.data?.user.id, refetch]);
-  console.log("ChatData", data);
 
   if (data === "Unauthorized") return null;
 

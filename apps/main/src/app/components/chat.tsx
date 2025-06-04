@@ -1,8 +1,9 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
-import type { ChatStatus, ChatStore } from "ai";
-import { useEffect, useState } from "react";
+import type { ChatStatus } from "ai";
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { createChatStore, useChat } from "@ai-sdk/react";
 import { IconExclamationCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
@@ -48,41 +49,35 @@ import { ScrollButton } from "@acme/ui/scroll-button";
 import { blurTransition } from "~/lib/transitions";
 import { getChats } from "./chat-actions";
 
-export function useChatStore() {
+export function DynamicChat({ chatId }: { chatId?: string }) {
   const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
-  const defaultChatStore = createChatStore({
-    maxSteps: 5,
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
-  });
 
-  const [store, setStore] = useState<ChatStore>(defaultChatStore);
-  useEffect(() => {
-    if (chatFetch.data) {
-      const transformedChats =
-        chatFetch.data !== "Unauthorized"
-          ? Object.fromEntries(chatFetch.data.map((item) => [item.id, item]))
-          : undefined;
-      setStore(
-        createChatStore({
-          maxSteps: 5,
-          chats: transformedChats,
-          transport: new DefaultChatTransport({ api: "/api/chat" }),
-        }),
-      );
-    }
+  const chatStore = useMemo(() => {
+    const store = createChatStore({
+      maxSteps: 5,
+      transport: new DefaultChatTransport({ api: "/api/chat" }),
+      chats:
+        chatFetch.data && chatFetch.data !== "Unauthorized"
+          ? Object.fromEntries(
+              chatFetch.data.map((chat) => [
+                chat.id,
+                { messages: chat.messages },
+              ]),
+            )
+          : {},
+    });
+    return store;
   }, [chatFetch.data]);
-  return { chatStore: store };
-}
 
-export default function Chat({ chatId }: { chatId?: string }) {
-  const { chatStore } = useChatStore();
   const { messages, handleSubmit, stop, setInput, input, status, error } =
     useChat({
       chatStore: chatStore,
       chatId: chatId ?? "1",
     });
+
   const canSubmit = status === "ready" || status === "error";
-  console.log(messages);
+  console.log("Messages", messages);
+  console.log("Chat store:", chatStore.getChats());
 
   return (
     <div className="absolute inset-0 h-full max-h-full overflow-hidden">
@@ -298,3 +293,4 @@ export function ChatMessage({
     </Message>
   );
 }
+export const Chat = dynamic(async () => DynamicChat, { ssr: false });
