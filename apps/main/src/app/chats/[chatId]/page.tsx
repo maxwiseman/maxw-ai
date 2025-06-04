@@ -1,13 +1,9 @@
 import { Chat } from "../../components/chat";
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ chatId: string }>;
-}) {
+export default function Page() {
   return (
     <div className="relative h-full">
-      <Chat chatId={(await params).chatId} />
+      <Chat />
     </div>
   );
 }

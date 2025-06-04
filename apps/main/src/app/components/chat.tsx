@@ -4,6 +4,7 @@ import type { UIMessage } from "@ai-sdk/react";
 import type { ChatStatus } from "ai";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 import { createChatStore, useChat } from "@ai-sdk/react";
 import { IconExclamationCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
@@ -50,6 +51,7 @@ import { blurTransition } from "~/lib/transitions";
 import { getChats } from "./chat-actions";
 
 export function DynamicChat({ chatId }: { chatId?: string }) {
+  const params = useParams();
   const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
 
   const chatStore = useMemo(() => {
@@ -72,7 +74,7 @@ export function DynamicChat({ chatId }: { chatId?: string }) {
   const { messages, handleSubmit, stop, setInput, input, status, error } =
     useChat({
       chatStore: chatStore,
-      chatId: chatId ?? "1",
+      chatId: (params.chatId as string | undefined) ?? chatId ?? "1",
     });
 
   const canSubmit = status === "ready" || status === "error";
