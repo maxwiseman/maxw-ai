@@ -3,11 +3,21 @@
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, Globe, Lock, Trash2 } from "lucide-react";
 
 import type { chat } from "@acme/db/schema";
 import { authClient } from "@acme/auth/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@acme/ui/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -17,7 +27,8 @@ import {
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
 
-import { getChats } from "./chat-actions";
+import { deleteChat, getChats } from "./chat-actions";
+import { queryClient } from "./query-client";
 
 function SidebarChatsDynamic() {
   const { data, refetch } = useQuery({
@@ -83,9 +94,10 @@ function SidebarChatsDynamic() {
                     <SidebarMenuButton className="line-clamp-1 break-all">
                       {chat.name}
                     </SidebarMenuButton>
-                    <SidebarMenuAction showOnHover>
+                    {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
-                    </SidebarMenuAction>
+                    </SidebarMenuAction> */}
+                    <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
                 </Link>
               ))}
@@ -114,9 +126,10 @@ function SidebarChatsDynamic() {
                     <SidebarMenuButton className="line-clamp-1 break-all">
                       {chat.name}
                     </SidebarMenuButton>
-                    <SidebarMenuAction showOnHover>
+                    {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
-                    </SidebarMenuAction>
+                    </SidebarMenuAction> */}
+                    <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
                 </Link>
               ))}
@@ -145,9 +158,10 @@ function SidebarChatsDynamic() {
                     <SidebarMenuButton className="line-clamp-1 break-all">
                       {chat.name}
                     </SidebarMenuButton>
-                    <SidebarMenuAction showOnHover>
+                    {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
-                    </SidebarMenuAction>
+                    </SidebarMenuAction> */}
+                    <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
                 </Link>
               ))}
@@ -158,6 +172,50 @@ function SidebarChatsDynamic() {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export const SidebarChats = dynamic(async () => SidebarChatsDynamic, {
   ssr: false,
 });
+
+export function SidebarChatDropdown({ chatId }: { chatId: string }) {
+  const params = useParams();
+  const router = useRouter();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuAction showOnHover>
+          <Ellipsis />
+        </SidebarMenuAction>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-36" side="right" align="start">
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Globe className="text-muted-foreground mr-2 !size-4" />
+            Sharing
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem>
+              <Globe className="!size-4" /> Public
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Lock /> Private
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuItem
+          onClick={async () => {
+            await deleteChat(chatId);
+            await queryClient.invalidateQueries({ queryKey: ["chats"] });
+            if (params.chatId === chatId) {
+              router.push("/");
+            }
+          }}
+        >
+          <Trash2 className="!size-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

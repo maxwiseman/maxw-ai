@@ -38,6 +38,36 @@ export async function POST(req: Request) {
     messages: convertToModelMessages(data.messages),
   });
 
+  const createChatPromise = (async () => {
+    const { rowsAffected } = await db
+      .insert(chat)
+      .values({
+        id: data.chatId,
+        name: "New Chat",
+        userId: session.user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing()
+      .execute();
+    return rowsAffected === 0;
+  })();
+  (async () => {
+    if ((await createChatPromise) === false) {
+      console.log("Generating chat name");
+      const { text } = await generateText({
+        model: gateway("openai/gpt-4.1-nano"),
+        system: `Your job is to provide a short title for the chat. The user will provide a message, and you will use that to create a very short name (1-3 words) for the chat.`,
+        messages: convertToModelMessages(data.messages),
+      });
+      await db
+        .update(chat)
+        .set({ name: text })
+        .where(eq(chat.id, data.chatId))
+        .execute();
+    }
+  })().catch(console.error);
+
   //   console.log(result);
   //   await result.consumeStream();
   return result.toUIMessageStreamResponse({
@@ -46,18 +76,7 @@ export async function POST(req: Request) {
     onFinish: (finishData) => {
       console.log(finishData.messages);
       (async () => {
-        const { rowsAffected } = await db
-          .insert(chat)
-          .values({
-            id: data.chatId,
-            name: "New Chat",
-            userId: session.user.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .onConflictDoNothing()
-          .execute();
-        const chatExists = rowsAffected === 0;
+        await createChatPromise;
         await db
           .insert(message)
           .values(
@@ -79,18 +98,6 @@ export async function POST(req: Request) {
             ]),
           })
           .execute();
-        if (!chatExists) {
-          const { text } = await generateText({
-            model: gateway("openai/gpt-4.1-nano"),
-            system: `Your job is to provide a short title for the chat. The user will provide a message, and you will use that to create a very short name (1-3 words) for the chat.`,
-            messages: convertToModelMessages(data.messages),
-          });
-          await db
-            .update(chat)
-            .set({ name: text })
-            .where(eq(chat.id, data.chatId))
-            .execute();
-        }
       })().catch(console.error);
     },
   });

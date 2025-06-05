@@ -18,6 +18,7 @@ export const queryClient = new QueryClient({
     },
   },
 });
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,

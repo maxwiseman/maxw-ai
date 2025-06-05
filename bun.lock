@@ -33,6 +33,7 @@
         "@trpc/server": "^11.1.4",
         "@vercel/ai-sdk-gateway": "^0.1.9",
         "@vercel/analytics": "^1.5.0",
+        "@vercel/functions": "^2.1.0",
         "ai": "^5.0.0-alpha.7",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -882,6 +883,8 @@
     "@vercel/ai-sdk-gateway": ["@vercel/ai-sdk-gateway@0.1.9", "", { "dependencies": { "@ai-sdk/provider": "2.0.0-alpha.7", "@ai-sdk/provider-utils": "3.0.0-alpha.7" }, "peerDependencies": { "zod": "^3.23.8" } }, "sha512-uHKIZc6K8Uf9p0v24KB00jXQKZn7yrSzjsB5v+FEd7mb/gI62mVQ3EvV9tzepkavIgyyNaDGnvoSBLqTB9FRCw=="],
 
     "@vercel/analytics": ["@vercel/analytics@1.5.0", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "react", "svelte", "vue", "vue-router"] }, "sha512-MYsBzfPki4gthY5HnYN7jgInhAZ7Ac1cYDoRWFomwGHWEX7odTEzbtg9kf/QSo7XEsEAqlQugA6gJ2WS2DEa3g=="],
+
+    "@vercel/functions": ["@vercel/functions@2.1.0", "", { "peerDependencies": { "@aws-sdk/credential-provider-web-identity": "*" }, "optionalPeers": ["@aws-sdk/credential-provider-web-identity"] }, "sha512-1gSbK9zfrbJxk1JTBVERDhLi01mK3fz+gw4GjOjZwHnqs0zsBhQA70HGVtXQX/Z3BTRMfbpAEMVDfhecRw0lDA=="],
 
     "@vercel/postgres": ["@vercel/postgres@0.10.0", "", { "dependencies": { "@neondatabase/serverless": "^0.9.3", "bufferutil": "^4.0.8", "ws": "^8.17.1" } }, "sha512-fSD23DxGND40IzSkXjcFcxr53t3Tiym59Is0jSYIFpG4/0f0KO9SGtcp1sXiebvPaGe7N/tU05cH4yt2S6/IPg=="],
 
