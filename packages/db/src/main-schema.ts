@@ -37,6 +37,7 @@ export const message = sqliteTable("message", {
     .notNull()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  order: integer("order").notNull(),
   parts: text("parts", { mode: "json" }).$type<UIMessage["parts"]>().notNull(),
   metadata: text("metadata", { mode: "json" }).$type<UIMessage["metadata"]>(),
   role: text("role", { mode: "json" }).$type<UIMessage["role"]>().notNull(),

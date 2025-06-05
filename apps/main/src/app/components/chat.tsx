@@ -2,7 +2,7 @@
 
 import type { UIMessage } from "@ai-sdk/react";
 import type { ChatStatus } from "ai";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { createChatStore, useChat } from "@ai-sdk/react";
@@ -49,32 +49,39 @@ import { ScrollButton } from "@acme/ui/scroll-button";
 
 import { blurTransition } from "~/lib/transitions";
 import { getChats } from "./chat-actions";
+import { queryClient } from "./query-client";
 
+const chatStore = createChatStore({
+  maxSteps: 5,
+  transport: new DefaultChatTransport({ api: "/api/chat" }),
+});
 export function DynamicChat({ chatId }: { chatId?: string }) {
   const params = useParams();
   const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
+  const newChatId = useMemo(() => crypto.randomUUID(), []);
 
-  const chatStore = useMemo(() => {
-    const store = createChatStore({
-      maxSteps: 5,
-      transport: new DefaultChatTransport({ api: "/api/chat" }),
-      chats:
-        chatFetch.data && chatFetch.data !== "Unauthorized"
-          ? Object.fromEntries(
-              chatFetch.data.map((chat) => [
-                chat.id,
-                { messages: chat.messages },
-              ]),
-            )
-          : {},
-    });
-    return store;
-  }, [chatFetch.data]);
+  useEffect(() => {
+    if (chatFetch.data && chatFetch.data !== "Unauthorized") {
+      chatFetch.data.forEach((chat) => {
+        if (!chatStore.hasChat(chat.id))
+          chatStore.addChat(chat.id, chat.messages);
+        chatStore.setMessages({
+          id: chat.id,
+          messages: chat.messages,
+        });
+      });
+    }
+  }, [chatFetch.data, chatFetch.isFetching]);
 
   const { messages, handleSubmit, stop, setInput, input, status, error } =
     useChat({
       chatStore: chatStore,
-      chatId: (params.chatId as string | undefined) ?? chatId ?? "1",
+      chatId: (params.chatId as string | undefined) ?? chatId ?? newChatId,
+      onFinish: () => {
+        queryClient
+          .invalidateQueries({ queryKey: ["chats"] })
+          .catch(console.error);
+      },
     });
 
   const canSubmit = status === "ready" || status === "error";
@@ -217,82 +224,84 @@ export function ChatMessage({
             );
         }
       })}
-      {message.role === "assistant" && (
-        <MessageActions>
-          <MessageAction tooltip="Copy message">
-            <Button
-              onClick={async () => {
-                const html = await marked.parse(
-                  message.parts
-                    .map((p) => (p.type === "text" ? p.text : ""))
-                    .join(""),
-                );
-                // await navigator.clipboard.writeText(
-                //   message.parts.find((part) => part.type === "text")?.text ??
-                //     "",
-                // );
-                await navigator.clipboard.write([
-                  new ClipboardItem({
-                    "text/html": new Blob([html], { type: "text/html" }),
-                    "text/plain": new Blob(
-                      [
-                        message.parts
-                          .map((p) => (p.type === "text" ? p.text : ""))
-                          .join(""),
-                      ],
-                      { type: "text/plain" },
-                    ),
-                  }),
-                ]);
-                setCopied(true);
-                setTimeout(() => {
-                  setCopied(false);
-                }, 3000);
-              }}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-            >
-              {copied ? (
-                <Check className={`!size-4`} />
-              ) : (
-                <Copy className={`!size-4`} />
-              )}
-            </Button>
-          </MessageAction>
-          <MessageAction tooltip="Like message">
-            <Button
-              onClick={() =>
-                setLikeStatus(likeStatus === "liked" ? "none" : "liked")
-              }
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-            >
-              <ThumbsUp
-                fill={likeStatus === "liked" ? "currentColor" : "none"}
-                className={`!size-4`}
-              />
-            </Button>
-          </MessageAction>
-          <MessageAction tooltip="Dislike message">
-            <Button
-              onClick={() =>
-                setLikeStatus(likeStatus === "disliked" ? "none" : "disliked")
-              }
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-            >
-              <ThumbsDown
-                fill={likeStatus === "disliked" ? "currentColor" : "none"}
-                className={`!size-4`}
-              />
-            </Button>
-          </MessageAction>
-        </MessageActions>
-      )}
+      {message.role === "assistant" &&
+        (!isLatest || status !== "streaming") && (
+          <MessageActions>
+            <MessageAction tooltip="Copy message">
+              <Button
+                onClick={async () => {
+                  const html = await marked.parse(
+                    message.parts
+                      .map((p) => (p.type === "text" ? p.text : ""))
+                      .join(""),
+                  );
+                  // await navigator.clipboard.writeText(
+                  //   message.parts.find((part) => part.type === "text")?.text ??
+                  //     "",
+                  // );
+                  await navigator.clipboard.write([
+                    new ClipboardItem({
+                      "text/html": new Blob([html], { type: "text/html" }),
+                      "text/plain": new Blob(
+                        [
+                          message.parts
+                            .map((p) => (p.type === "text" ? p.text : ""))
+                            .join(""),
+                        ],
+                        { type: "text/plain" },
+                      ),
+                    }),
+                  ]);
+                  setCopied(true);
+                  setTimeout(() => {
+                    setCopied(false);
+                  }, 3000);
+                }}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+              >
+                {copied ? (
+                  <Check className={`!size-4`} />
+                ) : (
+                  <Copy className={`!size-4`} />
+                )}
+              </Button>
+            </MessageAction>
+            <MessageAction tooltip="Like message">
+              <Button
+                onClick={() =>
+                  setLikeStatus(likeStatus === "liked" ? "none" : "liked")
+                }
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+              >
+                <ThumbsUp
+                  fill={likeStatus === "liked" ? "currentColor" : "none"}
+                  className={`!size-4`}
+                />
+              </Button>
+            </MessageAction>
+            <MessageAction tooltip="Dislike message">
+              <Button
+                onClick={() =>
+                  setLikeStatus(likeStatus === "disliked" ? "none" : "disliked")
+                }
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+              >
+                <ThumbsDown
+                  fill={likeStatus === "disliked" ? "currentColor" : "none"}
+                  className={`!size-4`}
+                />
+              </Button>
+            </MessageAction>
+          </MessageActions>
+        )}
     </Message>
   );
 }
+// eslint-disable-next-line @typescript-eslint/require-await -- dynamic requires an async function
 export const Chat = dynamic(async () => DynamicChat, { ssr: false });

@@ -16,7 +16,7 @@ export async function getChats() {
     where: eq(chat.userId, authData.user.id),
     with: {
       messages: {
-        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+        orderBy: (messages, { asc }) => [asc(messages.order)],
       },
     },
   });

@@ -66,23 +66,29 @@ function SidebarChatsDynamic() {
         <SidebarGroup>
           <SidebarGroupLabel>Today</SidebarGroupLabel>
           <SidebarMenu>
-            {categorizedChats.today.map((chat) => (
-              <Link
-                prefetch={true}
-                key={chat.id}
-                href={`/chats/${chat.id}`}
-                tabIndex={-1}
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="line-clamp-1 break-all">
-                    {chat.name}
-                  </SidebarMenuButton>
-                  <SidebarMenuAction showOnHover>
-                    <Ellipsis />
-                  </SidebarMenuAction>
-                </SidebarMenuItem>
-              </Link>
-            ))}
+            {categorizedChats.today
+              .sort(
+                (a, b) =>
+                  new Date(b.updatedAt ?? b.createdAt).getTime() -
+                  new Date(a.updatedAt ?? a.createdAt).getTime(),
+              )
+              .map((chat) => (
+                <Link
+                  prefetch={true}
+                  key={chat.id}
+                  href={`/chats/${chat.id}`}
+                  tabIndex={-1}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton className="line-clamp-1 break-all">
+                      {chat.name}
+                    </SidebarMenuButton>
+                    <SidebarMenuAction showOnHover>
+                      <Ellipsis />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                </Link>
+              ))}
           </SidebarMenu>
         </SidebarGroup>
       )}
@@ -91,23 +97,29 @@ function SidebarChatsDynamic() {
         <SidebarGroup>
           <SidebarGroupLabel>Last 7 Days</SidebarGroupLabel>
           <SidebarMenu>
-            {categorizedChats.last7Days.map((chat) => (
-              <Link
-                prefetch={true}
-                key={chat.id}
-                href={`/chats/${chat.id}`}
-                tabIndex={-1}
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="line-clamp-1 break-all">
-                    {chat.name}
-                  </SidebarMenuButton>
-                  <SidebarMenuAction showOnHover>
-                    <Ellipsis />
-                  </SidebarMenuAction>
-                </SidebarMenuItem>
-              </Link>
-            ))}
+            {categorizedChats.last7Days
+              .sort(
+                (a, b) =>
+                  new Date(b.updatedAt ?? b.createdAt).getTime() -
+                  new Date(a.updatedAt ?? a.createdAt).getTime(),
+              )
+              .map((chat) => (
+                <Link
+                  prefetch={true}
+                  key={chat.id}
+                  href={`/chats/${chat.id}`}
+                  tabIndex={-1}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton className="line-clamp-1 break-all">
+                      {chat.name}
+                    </SidebarMenuButton>
+                    <SidebarMenuAction showOnHover>
+                      <Ellipsis />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                </Link>
+              ))}
           </SidebarMenu>
         </SidebarGroup>
       )}
@@ -116,23 +128,29 @@ function SidebarChatsDynamic() {
         <SidebarGroup>
           <SidebarGroupLabel>Last 30 Days</SidebarGroupLabel>
           <SidebarMenu>
-            {categorizedChats.last30Days.map((chat) => (
-              <Link
-                prefetch={true}
-                key={chat.id}
-                href={`/chats/${chat.id}`}
-                tabIndex={-1}
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="line-clamp-1 break-all">
-                    {chat.name}
-                  </SidebarMenuButton>
-                  <SidebarMenuAction showOnHover>
-                    <Ellipsis />
-                  </SidebarMenuAction>
-                </SidebarMenuItem>
-              </Link>
-            ))}
+            {categorizedChats.last30Days
+              .sort(
+                (a, b) =>
+                  new Date(b.updatedAt ?? b.createdAt).getTime() -
+                  new Date(a.updatedAt ?? a.createdAt).getTime(),
+              )
+              .map((chat) => (
+                <Link
+                  prefetch={true}
+                  key={chat.id}
+                  href={`/chats/${chat.id}`}
+                  tabIndex={-1}
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton className="line-clamp-1 break-all">
+                      {chat.name}
+                    </SidebarMenuButton>
+                    <SidebarMenuAction showOnHover>
+                      <Ellipsis />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                </Link>
+              ))}
           </SidebarMenu>
         </SidebarGroup>
       )}
