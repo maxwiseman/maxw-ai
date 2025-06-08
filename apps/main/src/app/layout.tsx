@@ -52,9 +52,6 @@ export default function RootLayout(props: { children: React.ReactNode }) {
               </SidebarProvider>
             </QueryClientProvider>
           </TRPCReactProvider>
-          <div className="absolute right-4 bottom-4">
-            <ThemeToggle />
-          </div>
           <Toaster />
         </ThemeProvider>
         <Analytics />

@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   }
 
   const data = (await req.json()) as {
-    chatId: string;
+    id: string;
     messages: UIMessage<unknown, UIDataTypes>[];
   };
   console.log("Data: ", data);
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const { rowsAffected } = await db
       .insert(chat)
       .values({
-        id: data.chatId,
+        id: data.id,
         name: "New Chat",
         userId: session.user.id,
         createdAt: new Date(),
@@ -50,8 +50,10 @@ export async function POST(req: Request) {
       })
       .onConflictDoNothing()
       .execute();
+    console.log("Inserted chat");
     return rowsAffected === 0;
-  })();
+  })().catch(console.error);
+
   (async () => {
     if ((await createChatPromise) === false) {
       console.log("Generating chat name");
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
       await db
         .update(chat)
         .set({ name: text })
-        .where(eq(chat.id, data.chatId))
+        .where(eq(chat.id, data.id))
         .execute();
     }
   })().catch(console.error);
@@ -83,7 +85,7 @@ export async function POST(req: Request) {
             [...data.messages, ...finishData.messages].map((item, i) => ({
               ...item,
               order: i,
-              chatId: data.chatId,
+              chatId: data.id,
               createdAt: new Date(),
               updatedAt: new Date(),
             })),
