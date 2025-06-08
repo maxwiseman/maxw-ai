@@ -186,6 +186,7 @@ export function ChatMessage({
               return (
                 <Reasoning
                   key={partIndex}
+                  defaultOpen={false}
                   generating={isGeneratingPart}
                   className="text-muted-foreground"
                 >
