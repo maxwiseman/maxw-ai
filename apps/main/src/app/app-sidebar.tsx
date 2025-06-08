@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ArrowUpRight, Gauge, Plane } from "lucide-react";
 
+import { QuickLink } from "@acme/ui/quick-link";
 import {
   Sidebar,
   SidebarContent,
@@ -32,18 +32,18 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset">
       <SidebarHeader>
-        <Link
+        <QuickLink
           prefetch={true}
           href="/"
           className="mb-4 font-mono text-2xl font-bold"
         >
           maxw.ai
-        </Link>
+        </QuickLink>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
           {externalLinks.map((externalLink) => (
-            <Link
+            <QuickLink
               href={externalLink.href}
               target="_blank"
               key={externalLink.href}
@@ -62,7 +62,7 @@ export function AppSidebar() {
                   <ArrowUpRight />
                 </SidebarMenuAction>
               </SidebarMenuItem>
-            </Link>
+            </QuickLink>
           ))}
         </SidebarMenu>
         <SidebarChats />

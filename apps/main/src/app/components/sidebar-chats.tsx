@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Ellipsis, Globe, Lock, Trash2 } from "lucide-react";
@@ -18,6 +17,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@acme/ui/dropdown-menu";
+import { QuickLink } from "@acme/ui/quick-link";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -84,7 +84,7 @@ function SidebarChatsDynamic() {
                   new Date(a.updatedAt ?? a.createdAt).getTime(),
               )
               .map((chat) => (
-                <Link
+                <QuickLink
                   prefetch={true}
                   key={chat.id}
                   href={`/chats/${chat.id}`}
@@ -99,7 +99,7 @@ function SidebarChatsDynamic() {
                     </SidebarMenuAction> */}
                     <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
-                </Link>
+                </QuickLink>
               ))}
           </SidebarMenu>
         </SidebarGroup>
@@ -116,7 +116,7 @@ function SidebarChatsDynamic() {
                   new Date(a.updatedAt ?? a.createdAt).getTime(),
               )
               .map((chat) => (
-                <Link
+                <QuickLink
                   prefetch={true}
                   key={chat.id}
                   href={`/chats/${chat.id}`}
@@ -131,7 +131,7 @@ function SidebarChatsDynamic() {
                     </SidebarMenuAction> */}
                     <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
-                </Link>
+                </QuickLink>
               ))}
           </SidebarMenu>
         </SidebarGroup>
@@ -148,7 +148,7 @@ function SidebarChatsDynamic() {
                   new Date(a.updatedAt ?? a.createdAt).getTime(),
               )
               .map((chat) => (
-                <Link
+                <QuickLink
                   prefetch={true}
                   key={chat.id}
                   href={`/chats/${chat.id}`}
@@ -163,7 +163,7 @@ function SidebarChatsDynamic() {
                     </SidebarMenuAction> */}
                     <SidebarChatDropdown chatId={chat.id} />
                   </SidebarMenuItem>
-                </Link>
+                </QuickLink>
               ))}
           </SidebarMenu>
         </SidebarGroup>
