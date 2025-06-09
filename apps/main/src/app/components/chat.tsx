@@ -1,10 +1,10 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
-import type { ChatStatus } from "ai";
+import type { ChatRequestOptions, ChatStatus, UIMessagePart } from "ai";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useParams } from "next/navigation";
+import { redirect, useParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { IconExclamationCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +13,9 @@ import {
   ArrowUp,
   Check,
   Copy,
+  GitBranch,
   MessageCircleDashed,
+  RefreshCw,
   Square,
   ThumbsDown,
   ThumbsUp,
@@ -41,15 +43,17 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from "@acme/ui/prompt-input";
+import { QuickLink } from "@acme/ui/quick-link";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
 } from "@acme/ui/reasoning";
 import { ScrollButton } from "@acme/ui/scroll-button";
+import { toast } from "@acme/ui/toast";
 
 import { blurTransition } from "~/lib/transitions";
-import { getChats } from "./chat-actions";
+import { branchOff, getChats } from "./chat-actions";
 import { queryClient } from "./query-client";
 
 export function DynamicChat() {
@@ -59,7 +63,7 @@ export function DynamicChat() {
   const authData = authClient.useSession();
 
   const [input, setInput] = useState("");
-  const { messages, stop, status, error, sendMessage } = useChat({
+  const { messages, stop, status, error, sendMessage, reload } = useChat({
     id: (params.chatId as string | undefined) ?? newChatId,
     messages:
       (chatFetch.data !== "Unauthorized" &&
@@ -86,12 +90,14 @@ export function DynamicChat() {
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
+                chatId={params.chatId as string}
                 status={status}
                 message={message}
                 isLatest={message.id === messages[messages.length - 1]?.id}
                 className={cn(
                   message.role === "user" ? "self-end" : "w-full grow",
                 )}
+                reload={reload}
               />
             ))}
             {messages.length === 0 && (
@@ -102,12 +108,12 @@ export function DynamicChat() {
             )}
             {error && (
               <motion.div {...blurTransition}>
-                <Card className="border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-none">
-                  <CardHeader className="flex flex-row items-center gap-2 p-4 pb-0 text-lg font-medium">
-                    <IconExclamationCircle />
-                    {error.message}
+                <Card className="gap-2 border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-none">
+                  <CardHeader className="flex flex-row items-center gap-2 pb-0 text-lg font-medium">
+                    <IconExclamationCircle className="shrink-0" />
+                    {error.message === "" ? "Unknown Error" : error.message}
                   </CardHeader>
-                  <CardContent className="p-4 pt-2 text-sm">
+                  <CardContent className="text-sm text-amber-500/80">
                     {typeof error.cause === "string"
                       ? error.cause
                       : "We're sorry, but something went wrong."}
@@ -123,7 +129,14 @@ export function DynamicChat() {
           <PromptInput
             value={input}
             onValueChange={setInput}
-            onSubmit={canSubmit ? () => sendMessage({ text: input }) : stop}
+            onSubmit={
+              canSubmit
+                ? async () => {
+                    setInput("");
+                    await sendMessage({ text: input });
+                  }
+                : stop
+            }
             isLoading={canSubmit}
             className="w-full max-w-2xl"
           >
@@ -136,7 +149,10 @@ export function DynamicChat() {
                   variant="default"
                   size="icon"
                   className="h-8 w-8 rounded-full"
-                  onClick={() => sendMessage({ text: input })}
+                  onClick={async () => {
+                    setInput("");
+                    await sendMessage({ text: input });
+                  }}
                 >
                   {canSubmit ? (
                     <ArrowUp className="!size-5" />
@@ -158,16 +174,21 @@ export function ChatMessage({
   status,
   isLatest,
   className,
+  reload,
+  chatId,
 }: {
   message: UIMessage;
   status: ChatStatus;
   isLatest: boolean;
+  reload: (options?: ChatRequestOptions) => void;
+  chatId: string;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [likeStatus, setLikeStatus] = useState<"liked" | "disliked" | "none">(
     "none",
   );
+  const notLatestParts = ["data-name", "data-branch"];
 
   return (
     <Message
@@ -179,7 +200,10 @@ export function ChatMessage({
         const isGeneratingPart =
           status === "streaming" &&
           isLatest &&
-          partIndex === message.parts.length - 1;
+          partIndex ===
+            message.parts.filter((part) => !notLatestParts.includes(part.type))
+              .length -
+              1;
         switch (part.type) {
           case "reasoning":
             if (part.text.trim() !== "")
@@ -218,6 +242,40 @@ export function ChatMessage({
       {message.role === "assistant" &&
         (!isLatest || status !== "streaming") && (
           <MessageActions>
+            {isLatest && (
+              <MessageAction tooltip="Regenerate message">
+                <Button
+                  onClick={() => {
+                    reload({ body: { regenerate: true } });
+                  }}
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                >
+                  <RefreshCw className={`!size-4`} />
+                </Button>
+              </MessageAction>
+            )}
+            <MessageAction tooltip="Branch off">
+              <Button
+                onClick={async () => {
+                  const branchOffMutation = await branchOff(chatId, message.id);
+                  if (branchOffMutation.status !== "error") {
+                    await queryClient.invalidateQueries({
+                      queryKey: ["chats"],
+                    });
+                    redirect(`/chats/${branchOffMutation.newChatId}`);
+                  } else {
+                    toast.error(branchOffMutation.message);
+                  }
+                }}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+              >
+                <GitBranch className={`!size-4`} />
+              </Button>
+            </MessageAction>
             <MessageAction tooltip="Copy message">
               <Button
                 onClick={async () => {
@@ -226,10 +284,6 @@ export function ChatMessage({
                       .map((p) => (p.type === "text" ? p.text : ""))
                       .join(""),
                   );
-                  // await navigator.clipboard.writeText(
-                  //   message.parts.find((part) => part.type === "text")?.text ??
-                  //     "",
-                  // );
                   await navigator.clipboard.write([
                     new ClipboardItem({
                       "text/html": new Blob([html], { type: "text/html" }),
@@ -259,6 +313,7 @@ export function ChatMessage({
                 )}
               </Button>
             </MessageAction>
+
             <MessageAction tooltip="Like message">
               <Button
                 onClick={() =>
@@ -291,6 +346,32 @@ export function ChatMessage({
             </MessageAction>
           </MessageActions>
         )}
+      {(() => {
+        const branchPart = message.parts.find(
+          (part) => part.type === "data-branch",
+        ) as
+          | {
+              type: "data-branch";
+              data: { fromChatId: string; fromChatName: string };
+            }
+          | undefined;
+        if (!branchPart) return null;
+        const { fromChatId, fromChatName } = branchPart.data;
+        return (
+          <div className="text-muted-foreground mt-8 flex items-center justify-center gap-2">
+            <GitBranch className="!size-4" />
+            <div>
+              Branched off from{" "}
+              <QuickLink
+                className="decoration-muted-foreground/40 inline underline"
+                href={`/chats/${fromChatId}`}
+              >
+                {fromChatName}
+              </QuickLink>
+            </div>
+          </div>
+        );
+      })()}
     </Message>
   );
 }
