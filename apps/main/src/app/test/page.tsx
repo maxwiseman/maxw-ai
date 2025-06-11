@@ -1,21 +1,18 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
-import { getChats } from "../components/chat-actions";
+import { modelFeatures } from "~/lib/models";
+import { ModelPicker } from "../components/model-picker";
+import { PromptInputSelect } from "../components/prompt-input-toggle";
 
 export default function TestPage() {
-  const { data, fetchStatus, status, isFetching } = useQuery({
-    queryKey: ["chats"],
-    queryFn: getChats,
-  });
-
   return (
     <div className="flex size-full flex-col items-center justify-center gap-4">
-      <div>{status}</div>
-      <div>{fetchStatus}</div>
-      <div>{isFetching ? "fetching" : "not fetching"}</div>
-      <div>{JSON.stringify(data)}</div>
+      <ModelPicker />
+      <PromptInputSelect feature={modelFeatures.thinkSelect} iconOnly={false} />
+      <PromptInputSelect
+        feature={modelFeatures.searchToggle}
+        iconOnly={false}
+      />
     </div>
   );
 }

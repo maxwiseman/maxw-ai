@@ -5,17 +5,18 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  extractReasoningMiddleware,
   generateText,
   smoothStream,
   streamText,
-  wrapLanguageModel,
 } from "ai";
 
 import { auth } from "@acme/auth";
 import { buildConflictUpdateColumns, eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { chat, message } from "@acme/db/schema";
+
+import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
+import { getProvider } from "~/lib/provider-utils";
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -25,20 +26,18 @@ export async function POST(req: Request) {
 
   const data = (await req.json()) as {
     id: string;
+    model: ModelId;
     regenerate?: boolean;
+    features?: ModelFeatureResponse;
     messages: UIMessage<unknown, UIDataTypes>[];
   };
   console.log("Data: ", data);
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      const modelOptions = getProvider(data.model, data.features);
       const result = streamText({
-        model: wrapLanguageModel({
-          model: gateway("groq/deepseek-r1-distill-llama-70b"),
-          middleware: extractReasoningMiddleware({
-            tagName: "think",
-          }),
-        }),
+        ...modelOptions,
         experimental_transform: smoothStream({
           delayInMs: 20,
           chunking: "word",

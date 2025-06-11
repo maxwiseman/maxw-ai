@@ -1,7 +1,7 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
-import type { ChatRequestOptions, ChatStatus, UIMessagePart } from "ai";
+import type { ChatRequestOptions, ChatStatus } from "ai";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { redirect, useParams } from "next/navigation";
@@ -15,6 +15,7 @@ import {
   Copy,
   GitBranch,
   MessageCircleDashed,
+  Paperclip,
   RefreshCw,
   Square,
   ThumbsDown,
@@ -52,8 +53,12 @@ import {
 import { ScrollButton } from "@acme/ui/scroll-button";
 import { toast } from "@acme/ui/toast";
 
+import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
+import { models } from "~/lib/models";
 import { blurTransition } from "~/lib/transitions";
 import { branchOff, getChats } from "./chat-actions";
+import { ModelPicker } from "./model-picker";
+import { PromptInputSelect } from "./prompt-input-toggle";
 import { queryClient } from "./query-client";
 
 export function DynamicChat() {
@@ -63,6 +68,9 @@ export function DynamicChat() {
   const authData = authClient.useSession();
 
   const [input, setInput] = useState("");
+  const [model, setModel] = useState<ModelId | undefined>("gpt-4.1-nano");
+  const selectedModel = model ? models[model] : undefined;
+  const [features, setFeatures] = useState<ModelFeatureResponse>();
   const { messages, stop, status, error, sendMessage, reload } = useChat({
     id: (params.chatId as string | undefined) ?? newChatId,
     messages:
@@ -71,7 +79,9 @@ export function DynamicChat() {
         ? chatFetch.data?.find((chat) => chat.id === params.chatId)?.messages
         : undefined) ?? [],
     generateId: () => crypto.randomUUID(),
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+    }),
     onFinish: () => {
       queryClient
         .invalidateQueries({ queryKey: ["chats"] })
@@ -133,7 +143,10 @@ export function DynamicChat() {
               canSubmit
                 ? async () => {
                     setInput("");
-                    await sendMessage({ text: input });
+                    await sendMessage(
+                      { text: input },
+                      { body: { model, features } },
+                    );
                   }
                 : stop
             }
@@ -141,26 +154,92 @@ export function DynamicChat() {
             className="w-full max-w-2xl"
           >
             <PromptInputTextarea placeholder="Ask me anything..." />
-            <PromptInputActions className="justify-end pt-2">
-              <PromptInputAction
-                tooltip={canSubmit ? "Send message" : "Stop generation"}
-              >
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                  onClick={async () => {
-                    setInput("");
-                    await sendMessage({ text: input });
+            <PromptInputActions className="justify-between pt-2">
+              <div className="flex items-center gap-2">
+                <PromptInputAction tooltip={"Upload file"}>
+                  <Button
+                    className="rounded-full"
+                    variant="outline"
+                    size="icon"
+                  >
+                    <Paperclip className="!size-4" />
+                  </Button>
+                </PromptInputAction>
+                {selectedModel?.features?.map((feat) => (
+                  <PromptInputSelect
+                    key={feat.id}
+                    feature={feat}
+                    onValueChange={(value) => {
+                      setFeatures({ ...features, [feat.id]: value });
+                    }}
+                    iconOnly={false}
+                  />
+                ))}
+                {/* {selectedModel?.features?.map((feat) => (
+                  <PromptInputToggle
+                    key={feat.id}
+                    type="toggle"
+                    label={feat.display.label}
+                    tooltip={feat.display.tooltip}
+                  >
+                    <feat.display.icon />
+                  </PromptInputToggle>
+                ))} */}
+                {/* <PromptInputToggle
+                  value={features.think}
+                  onValueChange={(value) => {
+                    setFeatures({ ...features, think: value });
                   }}
+                  features={["think/optional"]}
+                  force={["think"]}
+                  tooltip={"Think for longer"}
+                  label={"Think"}
+                  model={selectedModel}
                 >
-                  {canSubmit ? (
-                    <ArrowUp className="!size-5" />
-                  ) : (
-                    <Square className="!size-5 fill-current" />
-                  )}
-                </Button>
-              </PromptInputAction>
+                  <Brain />
+                </PromptInputToggle>
+                <PromptInputToggle
+                  value={features.search}
+                  onValueChange={(value) => {
+                    setFeatures({ ...features, search: value });
+                  }}
+                  features={["search/optional"]}
+                  force={["search"]}
+                  tooltip={"Search the web"}
+                  label={"Search"}
+                  model={selectedModel}
+                >
+                  <Globe />
+                </PromptInputToggle> */}
+                <div />
+              </div>
+              <div className="flex items-center gap-2">
+                <PromptInputAction tooltip={"Change model"}>
+                  <ModelPicker value={model} onValueChange={setModel} />
+                </PromptInputAction>
+                <PromptInputAction
+                  tooltip={canSubmit ? "Send message" : "Stop generation"}
+                >
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={async () => {
+                      setInput("");
+                      await sendMessage(
+                        { text: input },
+                        { body: { model, features } },
+                      );
+                    }}
+                  >
+                    {canSubmit ? (
+                      <ArrowUp className="!size-5" />
+                    ) : (
+                      <Square className="!size-5 fill-current" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              </div>
             </PromptInputActions>
           </PromptInput>
         </div>
@@ -243,7 +322,7 @@ export function ChatMessage({
         (!isLatest || status !== "streaming") && (
           <MessageActions>
             {isLatest && (
-              <MessageAction tooltip="Regenerate message">
+              <MessageAction tooltip="Regenerate">
                 <Button
                   onClick={() => {
                     reload({ body: { regenerate: true } });
@@ -276,7 +355,7 @@ export function ChatMessage({
                 <GitBranch className={`!size-4`} />
               </Button>
             </MessageAction>
-            <MessageAction tooltip="Copy message">
+            <MessageAction tooltip="Copy">
               <Button
                 onClick={async () => {
                   const html = await marked.parse(
@@ -314,7 +393,7 @@ export function ChatMessage({
               </Button>
             </MessageAction>
 
-            <MessageAction tooltip="Like message">
+            <MessageAction tooltip="Like">
               <Button
                 onClick={() =>
                   setLikeStatus(likeStatus === "liked" ? "none" : "liked")
@@ -329,7 +408,7 @@ export function ChatMessage({
                 />
               </Button>
             </MessageAction>
-            <MessageAction tooltip="Dislike message">
+            <MessageAction tooltip="Dislike">
               <Button
                 onClick={() =>
                   setLikeStatus(likeStatus === "disliked" ? "none" : "disliked")

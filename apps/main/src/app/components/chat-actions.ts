@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 "use server";
 
 import { headers } from "next/headers";
@@ -6,6 +7,8 @@ import { auth } from "@acme/auth";
 import { and, eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { chat, message } from "@acme/db/schema";
+
+import { getAvailableModelIds } from "~/lib/provider-utils";
 
 export async function getChats() {
   const authData = await auth.api.getSession({ headers: await headers() });
@@ -111,4 +114,8 @@ export async function branchOff(chatId: string, fromMessageId: string) {
     )
     .execute();
   return { status: "success", newChatId };
+}
+
+export async function getAvailableModels() {
+  return getAvailableModelIds();
 }

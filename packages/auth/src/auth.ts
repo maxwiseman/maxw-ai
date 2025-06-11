@@ -8,6 +8,13 @@ import { db } from "@acme/db/client";
 
 import { env } from "../env";
 
+const origins = [];
+if (env.NODE_ENV === "development") origins.push("http://localhost:3000");
+if (env.VERCEL_PROJECT_PRODUCTION_URL) origins.push("http://localhost:3000");
+if (env.VERCEL_PROJECT_PRODUCTION_URL)
+  origins.push(`https://${env.VERCEL_PROJECT_PRODUCTION_URL}`);
+if (env.VERCEL_URL) origins.push(`https://${env.VERCEL_URL}`);
+
 export const config = {
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -25,14 +32,7 @@ export const config = {
       redirectURI: "http://localhost:3000/api/auth/callback/discord",
     },
   },
-  trustedOrigins: [
-    "exp://",
-    env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "",
-    env.VERCEL_BRANCH_URL ? `https://${env.VERCEL_BRANCH_URL}` : "",
-    env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "",
-  ],
+  trustedOrigins: ["exp://", ...origins],
   advanced: {
     crossSubDomainCookies: {
       enabled: true,
