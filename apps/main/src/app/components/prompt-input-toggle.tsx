@@ -23,7 +23,7 @@ export function PromptInputSelect({
   iconOnly,
   feature,
   onValueChange,
-  value,
+  //   value,
 }: SelectProps) {
   const isLocked =
     !feature.option ||
@@ -97,6 +97,7 @@ export function PromptInputSelect({
         {feature.option?.type === "select" &&
           feature.option.values.map((value) => (
             <SelectItem key={value.value} value={value.value}>
+              {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
               {value.icon && <value.icon />}
               {value.label}
             </SelectItem>

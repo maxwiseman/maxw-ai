@@ -92,7 +92,7 @@ function SidebarChatsDynamic() {
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton className="line-clamp-1 break-all">
-                      {chat.name}
+                      {chat.name.split("\n")[0]}
                     </SidebarMenuButton>
                     {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />

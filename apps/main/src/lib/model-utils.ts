@@ -3,6 +3,7 @@ import type { modelBrands, modelFeatures, models } from "./models";
 export type ModelId = keyof typeof models;
 
 export interface ModelFeatureDisplay {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: React.ComponentType<any>;
   label: string;
 }
@@ -26,6 +27,7 @@ export type ModelFeatureResponse = Partial<
   Record<keyof typeof modelFeatures, ModelFeatureReturn>
 >;
 export interface ModelBrand {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: React.ComponentType<any>;
   name: string;
 }

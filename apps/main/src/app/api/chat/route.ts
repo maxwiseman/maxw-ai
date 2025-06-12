@@ -69,10 +69,13 @@ export async function POST(req: Request) {
             system: `Your job is to provide a short title for the chat. The user will provide a message, and you will use that to create a very short name (1-3 words) for the chat.`,
             messages: convertToModelMessages(data.messages),
           });
-          writer.write({ type: "data-name", data: { chatName: text } });
+          writer.write({
+            type: "data-name",
+            data: { chatName: text.split("\n")[0] },
+          });
           await db
             .update(chat)
-            .set({ name: text })
+            .set({ name: text.split("\n")[0] })
             .where(eq(chat.id, data.id))
             .execute();
         }

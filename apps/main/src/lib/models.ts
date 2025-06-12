@@ -75,7 +75,7 @@ export const modelFeatures = defineModelFeatures({
     display: {
       icon: Brain,
       label: "Think",
-      tooltip: "Reasoning effort",
+      tooltip: "Think before responding",
     },
   },
   thinkSelectRequired: {
@@ -139,6 +139,12 @@ export const models = defineModels({
     brand: modelBrands.openai,
     url: "https://openai.com/api/models/gpt-4.1-mini",
   },
+  "gpt-4.1-nano": {
+    name: "GPT 4.1 Nano",
+    description: "GPT 4.1 Nano is a smaller version of GPT 4.1.",
+    brand: modelBrands.openai,
+    url: "https://openai.com/api/models/gpt-4-1-nano",
+  },
   "o4-mini": {
     name: "o4 Mini",
     description:
@@ -147,20 +153,20 @@ export const models = defineModels({
     url: "https://openai.com/api/models/o4-mini",
     features: [modelFeatures.thinkSelectRequired],
   },
+  o3: {
+    name: "o3",
+    description: "o3 is a reasoning model that can generate text and code.",
+    brand: modelBrands.openai,
+    url: "https://openai.com/api/models/o3",
+    features: [modelFeatures.thinkSelectRequired],
+  },
   "claude-3.7-sonnet": {
     name: "Claude 3.7 Sonnet",
     description:
       "Claude 3.7 Sonnet is a large language model that can generate text, images, and code.",
     brand: modelBrands.anthropic,
     url: "https://openai.com/api/models/claude-3-7-sonnet",
-    features: [modelFeatures.thinkToggle],
-  },
-  "claude-3.7-sonnet-reasoning": {
-    name: "Claude 3.7 Sonnet (Reasoning)",
-    description:
-      "Claude 3.7 Sonnet (Reasoning) is a reasoning-focused large language model.",
-    brand: modelBrands.anthropic,
-    url: "https://openai.com/api/models/claude-3-7-sonnet-reasoning",
+    features: [modelFeatures.thinkSelect],
   },
   "claude-3.5-sonnet": {
     name: "Claude 3.5 Sonnet",
@@ -175,7 +181,7 @@ export const models = defineModels({
       "Claude 4 Sonnet is a large language model that can generate text, images, and code.",
     brand: modelBrands.anthropic,
     url: "https://openai.com/api/models/claude-4-sonnet",
-    features: [modelFeatures.thinkToggle],
+    features: [modelFeatures.thinkSelect],
   },
   "claude-4-opus": {
     name: "Claude 4 Opus",
@@ -231,24 +237,6 @@ export const models = defineModels({
     description: "Gemini 2.5 Pro is a professional-grade large language model.",
     brand: modelBrands.gemini,
     url: "https://meta.com/api/models/gemini-2-5-pro",
-  },
-  "gpt-4.1-nano": {
-    name: "GPT 4.1 Nano",
-    description: "GPT 4.1 Nano is a smaller version of GPT 4.1.",
-    brand: modelBrands.openai,
-    url: "https://openai.com/api/models/gpt-4-1-nano",
-  },
-  o3: {
-    name: "o3",
-    description: "o3 is a reasoning model that can generate text and code.",
-    brand: modelBrands.openai,
-    url: "https://openai.com/api/models/o3",
-  },
-  "o3-mini": {
-    name: "o3 Mini",
-    description: "o3 Mini is a smaller reasoning model.",
-    brand: modelBrands.openai,
-    url: "https://openai.com/api/models/o3-mini",
   },
   "llama-4-scout": {
     name: "Llama 4 Scout",

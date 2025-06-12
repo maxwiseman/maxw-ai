@@ -36,3 +36,16 @@ export function toTitleCase(str: string): string {
     })
     .join(" ");
 }
+
+export async function fileToFileUIPart(
+  file: File,
+): Promise<{ type: "file"; mediaType: string; url: string; name: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+  return {
+    type: "file",
+    mediaType: file.type,
+    url: `data:${file.type};base64,${base64}`,
+    name: file.name,
+  };
+}

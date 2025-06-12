@@ -2,7 +2,7 @@
 
 import type { UIMessage } from "@ai-sdk/react";
 import type { ChatRequestOptions, ChatStatus } from "ai";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { redirect, useParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -13,6 +13,7 @@ import {
   ArrowUp,
   Check,
   Copy,
+  File,
   GitBranch,
   MessageCircleDashed,
   Paperclip,
@@ -20,6 +21,7 @@ import {
   Square,
   ThumbsDown,
   ThumbsUp,
+  X,
 } from "lucide-react";
 import { marked } from "marked";
 import { motion } from "motion/react";
@@ -56,6 +58,7 @@ import { toast } from "@acme/ui/toast";
 import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
 import { models } from "~/lib/models";
 import { blurTransition } from "~/lib/transitions";
+import { fileToFileUIPart } from "~/lib/utils";
 import { branchOff, getChats } from "./chat-actions";
 import { ModelPicker } from "./model-picker";
 import { PromptInputSelect } from "./prompt-input-toggle";
@@ -66,8 +69,9 @@ export function DynamicChat() {
   const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
   const newChatId = useMemo(() => crypto.randomUUID(), []);
   const authData = authClient.useSession();
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [model, setModel] = useState<ModelId | undefined>("gpt-4.1-nano");
   const selectedModel = model ? models[model] : undefined;
   const [features, setFeatures] = useState<ModelFeatureResponse>();
@@ -90,6 +94,17 @@ export function DynamicChat() {
   });
 
   const canSubmit = status === "ready" || status === "error";
+  const submit = async () => {
+    setInput("");
+    setFiles([]);
+    await sendMessage(
+      {
+        text: input,
+        files: await Promise.all(files.map(fileToFileUIPart)),
+      },
+      { body: { model, features } },
+    );
+  };
   console.log("Messages", messages);
 
   return (
@@ -136,17 +151,33 @@ export function DynamicChat() {
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 m-4 flex flex-col items-center justify-center gap-2 [&>*]:pointer-events-auto">
           <ScrollButton className="size-9" />
+          <div className="flex w-full max-w-2xl gap-2 overflow-x-scroll">
+            {files.map((file) => (
+              <div key={file.name} className="bg-background rounded-full">
+                <div className="bg-background dark:bg-input/30 line-clamp-1 flex cursor-default items-center gap-1 rounded-full border p-1 px-3 pr-1 shadow-md/2">
+                  <div className="truncate">{file.name}</div>
+                  <Button
+                    className="size-auto rounded-full !p-1"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setFiles(files.filter((f) => f.name !== file.name));
+                    }}
+                  >
+                    <X className="!size-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <PromptInput
             value={input}
             onValueChange={setInput}
             onSubmit={
               canSubmit
                 ? async () => {
-                    setInput("");
-                    await sendMessage(
-                      { text: input },
-                      { body: { model, features } },
-                    );
+                    await submit();
                   }
                 : stop
             }
@@ -156,11 +187,21 @@ export function DynamicChat() {
             <PromptInputTextarea placeholder="Ask me anything..." />
             <PromptInputActions className="justify-between pt-2">
               <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  className="hidden"
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    setFiles(Array.from(e.target.files ?? []));
+                  }}
+                />
                 <PromptInputAction tooltip={"Upload file"}>
                   <Button
                     className="rounded-full"
                     variant="outline"
                     size="icon"
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip className="!size-4" />
                   </Button>
@@ -225,11 +266,7 @@ export function DynamicChat() {
                     size="icon"
                     className="h-8 w-8 rounded-full"
                     onClick={async () => {
-                      setInput("");
-                      await sendMessage(
-                        { text: input },
-                        { body: { model, features } },
-                      );
+                      await submit();
                     }}
                   >
                     {canSubmit ? (
@@ -284,6 +321,34 @@ export function ChatMessage({
               .length -
               1;
         switch (part.type) {
+          case "file":
+            if (part.mediaType.startsWith("image/"))
+              return (
+                <div className="self-end" key={partIndex}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="max-h-64 max-w-64 rounded-md border"
+                    src={part.url}
+                    alt={(part as unknown as { name: string }).name}
+                  />
+                </div>
+              );
+            return (
+              <div
+                className="bg-muted flex gap-3 self-end rounded-lg p-4 pr-5"
+                key={partIndex}
+              >
+                <File className="!size-10" />
+                <div className="flex flex-col">
+                  <div className="line-clamp-1 max-w-64 font-medium">
+                    {(part as unknown as { name: string }).name}
+                  </div>
+                  <div className="text-muted-foreground text-sm">
+                    {part.mediaType}
+                  </div>
+                </div>
+              </div>
+            );
           case "reasoning":
             if (part.text.trim() !== "")
               return (

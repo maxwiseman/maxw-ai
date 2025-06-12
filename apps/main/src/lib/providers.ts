@@ -19,7 +19,9 @@ export const modelProviders = defineProviders({
   "gpt-4o": {
     openai: ({ features }) => ({
       model: openai.responses("gpt-4o"),
-      system: "Use your web search tool to find the most relevant information.",
+      system: features.searchToggle?.enabled
+        ? "Use your web search tool to find the most relevant information."
+        : undefined,
       tools: features.searchToggle?.enabled
         ? { web_search_preview: openai.tools.webSearchPreview() }
         : undefined,
@@ -29,7 +31,9 @@ export const modelProviders = defineProviders({
   "gpt-4o-mini": {
     openai: ({ features }) => ({
       model: openai.responses("gpt-4o-mini"),
-      system: "Use your web search tool to find the most relevant information.",
+      system: features.searchToggle?.enabled
+        ? "Use your web search tool to find the most relevant information."
+        : undefined,
       tools: features.searchToggle?.enabled
         ? { web_search_preview: openai.tools.webSearchPreview() }
         : undefined,
@@ -37,23 +41,37 @@ export const modelProviders = defineProviders({
     gateway: gateway("openai/gpt-4o-mini"),
   },
   "gpt-4.1": {
-    gateway: gateway("openai/gpt-4.1"),
     openai: openai("gpt-4.1"),
+    gateway: gateway("openai/gpt-4.1"),
   },
   "gpt-4.1-mini": {
-    gateway: gateway("openai/gpt-4.1-mini"),
     openai: openai("gpt-4.1-mini"),
+    gateway: gateway("openai/gpt-4.1-mini"),
+  },
+  "gpt-4.1-nano": {
+    gateway: gateway("openai/gpt-4.1-nano"),
   },
   "o4-mini": {
     openai: ({ features }) => ({
       model: openai.responses("o4-mini"),
-      providerOptions: features.thinkSelectRequired?.enabled
-        ? {
-            openai: {
-              reasoningEffort: features.thinkSelectRequired.value ?? "low",
-            },
-          }
-        : undefined,
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
+    }),
+    gateway: gateway("openai/o4-mini"),
+  },
+  o3: {
+    openai: ({ features }) => ({
+      model: openai.responses("o3"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
     }),
     gateway: gateway("openai/o4-mini"),
   },
@@ -92,15 +110,6 @@ export const modelProviders = defineProviders({
   },
   "gemini-2.5-pro": {
     // gateway: gateway("vertex/gemini-2.5-pro-exp-01-21"),
-  },
-  "gpt-4.1-nano": {
-    gateway: gateway("openai/gpt-4.1-nano"),
-  },
-  o3: {
-    gateway: gateway("openai/o3"),
-  },
-  "o3-mini": {
-    gateway: gateway("openai/o3-mini"),
   },
   "llama-4-scout": {
     gateway: gateway("groq/llama-4-scout-17b-16e-instruct"),
