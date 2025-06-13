@@ -34,6 +34,7 @@ import {
   ChatContainerRoot,
 } from "@acme/ui/chat-container";
 import { cn } from "@acme/ui/index";
+import { MagicIcon } from "@acme/ui/magic-icon";
 import {
   Message,
   MessageAction,
@@ -60,6 +61,7 @@ import { models } from "~/lib/models";
 import { blurTransition } from "~/lib/transitions";
 import { fileToFileUIPart } from "~/lib/utils";
 import { branchOff, getChats } from "./chat-actions";
+import { ChatShareModal } from "./chat-share-modal";
 import { ModelPicker } from "./model-picker";
 import { PromptInputSelect } from "./prompt-input-toggle";
 import { queryClient } from "./query-client";
@@ -67,6 +69,10 @@ import { queryClient } from "./query-client";
 export function DynamicChat() {
   const params = useParams();
   const chatFetch = useQuery({ queryFn: getChats, queryKey: ["chats"] });
+  const chatData =
+    chatFetch.data !== "Unauthorized"
+      ? chatFetch.data?.find((chat) => chat.id === params.chatId)
+      : undefined;
   const newChatId = useMemo(() => crypto.randomUUID(), []);
   const authData = authClient.useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +86,7 @@ export function DynamicChat() {
     messages:
       (chatFetch.data !== "Unauthorized" &&
       (authData.isPending || authData.data?.user)
-        ? chatFetch.data?.find((chat) => chat.id === params.chatId)?.messages
+        ? chatData?.messages
         : undefined) ?? [],
     generateId: () => crypto.randomUUID(),
     transport: new DefaultChatTransport({
@@ -108,9 +114,15 @@ export function DynamicChat() {
   console.log("Messages", messages);
 
   return (
-    <div className="absolute inset-0 h-full max-h-full overflow-hidden">
+    <div className="absolute inset-0 h-full max-h-full">
       <ChatContainerRoot className="absolute inset-0 overflow-scroll">
         <ChatContainerContent>
+          <div className="bg-background/80 sticky inset-x-0 top-0 z-5 flex items-center justify-between border-b p-4 backdrop-blur lg:absolute lg:border-none lg:bg-transparent lg:backdrop-blur-none">
+            <div />
+            <ChatShareModal
+              chatId={(params.chatId as string | undefined) ?? ""}
+            />
+          </div>
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-8 pb-64 sm:px-8 lg:px-16">
             {messages.map((message) => (
               <ChatMessage
@@ -216,42 +228,6 @@ export function DynamicChat() {
                     iconOnly={false}
                   />
                 ))}
-                {/* {selectedModel?.features?.map((feat) => (
-                  <PromptInputToggle
-                    key={feat.id}
-                    type="toggle"
-                    label={feat.display.label}
-                    tooltip={feat.display.tooltip}
-                  >
-                    <feat.display.icon />
-                  </PromptInputToggle>
-                ))} */}
-                {/* <PromptInputToggle
-                  value={features.think}
-                  onValueChange={(value) => {
-                    setFeatures({ ...features, think: value });
-                  }}
-                  features={["think/optional"]}
-                  force={["think"]}
-                  tooltip={"Think for longer"}
-                  label={"Think"}
-                  model={selectedModel}
-                >
-                  <Brain />
-                </PromptInputToggle>
-                <PromptInputToggle
-                  value={features.search}
-                  onValueChange={(value) => {
-                    setFeatures({ ...features, search: value });
-                  }}
-                  features={["search/optional"]}
-                  force={["search"]}
-                  tooltip={"Search the web"}
-                  label={"Search"}
-                  model={selectedModel}
-                >
-                  <Globe />
-                </PromptInputToggle> */}
                 <div />
               </div>
               <div className="flex items-center gap-2">
@@ -444,17 +420,19 @@ export function ChatMessage({
                   setCopied(true);
                   setTimeout(() => {
                     setCopied(false);
-                  }, 3000);
+                  }, 2000);
                 }}
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full"
               >
-                {copied ? (
-                  <Check className={`!size-4`} />
-                ) : (
-                  <Copy className={`!size-4`} />
-                )}
+                <MagicIcon animationKey={copied ? "copied" : "not-copied"}>
+                  {copied ? (
+                    <Check className={`!size-4`} />
+                  ) : (
+                    <Copy className={`!size-4`} />
+                  )}
+                </MagicIcon>
               </Button>
             </MessageAction>
 
@@ -496,22 +474,30 @@ export function ChatMessage({
         ) as
           | {
               type: "data-branch";
-              data: { fromChatId: string; fromChatName: string };
+              data: {
+                fromChatId?: string;
+                fromChatName?: string;
+                fromUser?: string;
+              };
             }
           | undefined;
         if (!branchPart) return null;
-        const { fromChatId, fromChatName } = branchPart.data;
+        const { fromChatId, fromChatName, fromUser } = branchPart.data;
         return (
           <div className="text-muted-foreground mt-8 flex items-center justify-center gap-2">
             <GitBranch className="!size-4" />
             <div>
               Branched off from{" "}
-              <QuickLink
-                className="decoration-muted-foreground/40 inline underline"
-                href={`/chats/${fromChatId}`}
-              >
-                {fromChatName}
-              </QuickLink>
+              {fromChatId && fromChatName ? (
+                <QuickLink
+                  className="decoration-muted-foreground/40 inline underline"
+                  href={`/chats/${fromChatId}`}
+                >
+                  {fromChatName}
+                </QuickLink>
+              ) : fromUser ? (
+                <span>{`${fromUser}'s chat`}</span>
+              ) : null}
             </div>
           </div>
         );

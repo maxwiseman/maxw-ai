@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { IconCheck, IconCopy } from "@tabler/icons-react";
+import { Check, Copy } from "lucide-react";
 import { useTheme } from "next-themes";
 import { codeToHtml } from "shiki";
 
 import { cn } from ".";
 import { Button } from "./button";
+import { MagicIcon } from "./magic-icon";
 
 export type CodeBlockProps = {
   children?: React.ReactNode;
@@ -89,14 +90,16 @@ function CodeBlockCode({
             setCopied(true);
             setTimeout(() => {
               setCopied(false);
-            }, 1000);
+            }, 2000);
           }}
         >
-          {copied ? (
-            <IconCheck className="size-4" />
-          ) : (
-            <IconCopy className="size-4" />
-          )}
+          <MagicIcon animationKey={copied ? "copied" : "not-copied"}>
+            {copied ? (
+              <Check className="size-4" />
+            ) : (
+              <Copy className="size-4" />
+            )}
+          </MagicIcon>
         </Button>
       </div>
       <div

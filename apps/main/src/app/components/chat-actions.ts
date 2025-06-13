@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { auth } from "@acme/auth";
 import { and, eq } from "@acme/db";
 import { db } from "@acme/db/client";
-import { chat, message } from "@acme/db/schema";
+import { chat, chatShare, message } from "@acme/db/schema";
 
 import { getAvailableModelIds } from "~/lib/provider-utils";
 
@@ -118,4 +118,109 @@ export async function branchOff(chatId: string, fromMessageId: string) {
 
 export async function getAvailableModels() {
   return getAvailableModelIds();
+}
+
+export async function createChatShare(chatId: string) {
+  const authData = await auth.api.getSession({ headers: await headers() });
+  if (!authData?.user) {
+    return "Unauthorized";
+  }
+  const chatShareData = await db.query.chatShare.findFirst({
+    where: and(
+      eq(chatShare.chatId, chatId),
+      eq(chatShare.userId, authData.user.id),
+    ),
+  });
+  if (chatShareData) {
+    return chatShareData.id;
+  }
+  const chatData = await db.query.chat.findFirst({
+    where: eq(chat.id, chatId),
+  });
+  if (!chatData || chatData.userId !== authData.user.id) {
+    return "Chat not found";
+  }
+  const newChatShareId = crypto.randomUUID();
+  await db
+    .insert(chatShare)
+    .values({
+      id: newChatShareId,
+      chatId,
+      userId: authData.user.id,
+    })
+    .execute();
+  return newChatShareId;
+}
+
+export async function getChatShare(chatShareId: string) {
+  const authData = await auth.api.getSession({ headers: await headers() });
+  const chatShareData = await db.query.chatShare.findFirst({
+    where: eq(chatShare.id, chatShareId),
+    with: {
+      chat: {
+        with: {
+          user: true,
+          messages: { orderBy: (messages, { asc }) => [asc(messages.order)] },
+        },
+      },
+    },
+  });
+  if (!chatShareData) {
+    return {
+      status: "error",
+      error: "not-found",
+      message: "Share link not found",
+    };
+  }
+  if (authData?.user) {
+    const newChatId = crypto.randomUUID();
+    await db
+      .insert(chat)
+      .values({
+        id: newChatId,
+        name: `${chatShareData.chat.name} (branch)`,
+        userId: authData.user.id,
+      })
+      .execute();
+    await db.insert(message).values(
+      chatShareData.chat.messages.map((message, messageIndex) => ({
+        ...message,
+        id: crypto.randomUUID(),
+        chatId: newChatId,
+        parts:
+          messageIndex !== chatShareData.chat.messages.length - 1
+            ? message.parts
+            : [
+                ...message.parts,
+                {
+                  type: "data-branch" as const,
+                  data: {
+                    fromUser: chatShareData.chat.user.name,
+                  },
+                },
+              ],
+      })),
+    );
+    return {
+      status: "branched",
+      newChatId,
+    };
+  }
+  return {
+    status: "found",
+    chat: chatShareData.chat,
+  };
+}
+
+export async function deleteChatShare(chatId: string) {
+  const authData = await auth.api.getSession({ headers: await headers() });
+  if (!authData?.user) {
+    return "Unauthorized";
+  }
+  await db
+    .delete(chatShare)
+    .where(
+      and(eq(chatShare.chatId, chatId), eq(chatShare.userId, authData.user.id)),
+    )
+    .execute();
 }
