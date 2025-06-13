@@ -17,12 +17,18 @@ import { Input } from "@acme/ui/input";
 
 import { createChatShare, deleteChatShare } from "./chat-actions";
 
-export function ChatShareModal({ chatId }: { chatId: string }) {
+export function ChatShareModal({
+  chatId,
+  children,
+}: {
+  chatId: string;
+  children?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="rounded-full">Share</Button>
+        {children ?? <Button className="rounded-full">Share</Button>}
       </DialogTrigger>
       <DialogContent>
         <ChatShareModalContent chatId={chatId} setOpen={setOpen} />

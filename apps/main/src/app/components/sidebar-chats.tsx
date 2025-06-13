@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Ellipsis, Globe, Lock, Trash2 } from "lucide-react";
+import { Ellipsis, Globe, Lock, Share, Trash2 } from "lucide-react";
 
 import type { chat } from "@acme/db/schema";
 import { authClient } from "@acme/auth/client";
@@ -28,6 +28,7 @@ import {
 } from "@acme/ui/sidebar";
 
 import { deleteChat, getChats } from "./chat-actions";
+import { ChatShareModal } from "./chat-share-modal";
 import { queryClient } from "./query-client";
 
 function SidebarChatsDynamic() {
@@ -91,8 +92,10 @@ function SidebarChatsDynamic() {
                   tabIndex={-1}
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton className="line-clamp-1 break-all">
-                      {chat.name.split("\n")[0]}
+                    <SidebarMenuButton>
+                      <div className="line-clamp-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {chat.name}
+                      </div>
                     </SidebarMenuButton>
                     {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
@@ -123,8 +126,10 @@ function SidebarChatsDynamic() {
                   tabIndex={-1}
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton className="line-clamp-1 break-all">
-                      {chat.name}
+                    <SidebarMenuButton>
+                      <div className="line-clamp-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {chat.name}
+                      </div>
                     </SidebarMenuButton>
                     {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
@@ -155,8 +160,10 @@ function SidebarChatsDynamic() {
                   tabIndex={-1}
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton className="line-clamp-1 break-all">
-                      {chat.name}
+                    <SidebarMenuButton>
+                      <div className="line-clamp-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {chat.name}
+                      </div>
                     </SidebarMenuButton>
                     {/* <SidebarMenuAction showOnHover>
                       <Ellipsis />
@@ -189,20 +196,12 @@ export function SidebarChatDropdown({ chatId }: { chatId: string }) {
         </SidebarMenuAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-36" side="right" align="start">
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Globe className="text-muted-foreground mr-2 !size-4" />
-            Sharing
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem>
-              <Globe className="!size-4" /> Public
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Lock /> Private
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        {/* <ChatShareModal chatId={chatId}>
+          <DropdownMenuItem>
+            <Share className="!size-4" />
+            Share
+          </DropdownMenuItem>
+        </ChatShareModal> */}
         <DropdownMenuItem
           onClick={async () => {
             await deleteChat(chatId);
