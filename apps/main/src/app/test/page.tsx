@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Check, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 
 import { Button } from "@acme/ui/button";
 import { MagicIcon } from "@acme/ui/magic-icon";

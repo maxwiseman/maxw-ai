@@ -49,6 +49,9 @@
     "AUTH_REDIRECT_PROXY_URL",
     "AUTH_SECRET",
     "BETTER_AUTH_URL",
+    "AUTH_GITHUB_ID",
+    "AUTH_GITHUB_SECRET",
+    "OPENAI_API_KEY",
     "PORT"
   ],
   "globalPassThroughEnv": [

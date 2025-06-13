@@ -262,6 +262,7 @@ export function DynamicChat() {
 }
 
 export function ChatMessage({
+  readOnly = false,
   message,
   status,
   isLatest,
@@ -269,6 +270,7 @@ export function ChatMessage({
   reload,
   chatId,
 }: {
+  readOnly?: boolean;
   message: UIMessage;
   status: ChatStatus;
   isLatest: boolean;
@@ -360,7 +362,8 @@ export function ChatMessage({
         }
       })}
       {message.role === "assistant" &&
-        (!isLatest || status !== "streaming") && (
+        (!isLatest || status !== "streaming") &&
+        !readOnly && (
           <MessageActions>
             {isLatest && (
               <MessageAction tooltip="Regenerate">
