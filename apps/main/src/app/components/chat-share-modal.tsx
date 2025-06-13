@@ -73,7 +73,8 @@ export function ChatShareModalContent({
       <div className="space-y-2">
         <DialogTitle>Share Chat</DialogTitle>
         <DialogDescription>
-          Use this link to share this chat with others.
+          Use this link to share this chat with others. Your name may be shared
+          with the recipient.
         </DialogDescription>
       </div>
       <div className="relative">

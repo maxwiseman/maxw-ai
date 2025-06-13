@@ -65,6 +65,18 @@ export default function SharePage({
   return (
     <div className="absolute inset-0">
       <div className="size-full max-h-full overflow-y-scroll">
+        <div className="bg-background/80 sticky top-0 flex w-full items-center justify-center border-b p-1 backdrop-blur">
+          <div className="w-full max-w-3xl px-4 sm:px-8 lg:px-16">
+            <div className="flex flex-col">
+              <h1 className="line-clamp-1 text-lg font-bold">
+                {chatData.data.chat?.name}
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                {`By ${chatData.data.chat?.user.name} ⋅ ${chatData.data.chat?.createdAt ? (typeof chatData.data.chat.createdAt === "string" ? new Date(chatData.data.chat.createdAt) : chatData.data.chat.createdAt).toLocaleDateString() : "Unknown date"}`}
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-8 pb-24 sm:px-8 lg:px-16">
           {chatData.data.chat?.messages.map((message) => (
             <ChatMessage
