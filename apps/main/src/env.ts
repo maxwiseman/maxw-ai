@@ -18,6 +18,13 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
     DATABASE_AUTH_TOKEN: z.string(),
+    VERCEL_OIDC_TOKEN: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    ANTRHOPIC_API_KEY: z.string().optional(),
+    XAI_API_KEY: z.string().optional(),
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
+    PERPLEXITY_API_KEY: z.string().optional(),
+    GROQ_API_KEY: z.string().optional(),
   },
 
   /**

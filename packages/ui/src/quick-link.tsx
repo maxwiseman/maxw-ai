@@ -11,6 +11,7 @@ export function QuickLink(props: React.ComponentProps<typeof Link>) {
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         router.push(props.href.toString());
       }}
       {...props}

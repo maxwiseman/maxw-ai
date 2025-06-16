@@ -1,17 +1,25 @@
+import type { AnthropicProviderOptions } from "@ai-sdk/anthropic";
+import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { gateway } from "@vercel/ai-sdk-gateway";
 
+import { env } from "~/env";
 import { defineProviderAvailability, defineProviders } from "./provider-utils";
 
 export const providerAvailability = defineProviderAvailability({
   gateway: () => {
-    return true;
+    return !!env.VERCEL_OIDC_TOKEN || !!env.VERCEL;
   },
   openai: () => {
-    return true;
+    return !!env.OPENAI_API_KEY;
   },
   anthropic: () => {
-    return false;
+    return !!env.ANTRHOPIC_API_KEY;
+  },
+  google: () => {
+    return !!env.GOOGLE_GENERATIVE_AI_API_KEY;
   },
 });
 
@@ -49,6 +57,7 @@ export const modelProviders = defineProviders({
     gateway: gateway("openai/gpt-4.1-mini"),
   },
   "gpt-4.1-nano": {
+    openai: openai("gpt-4.1-nano"),
     gateway: gateway("openai/gpt-4.1-nano"),
   },
   "o4-mini": {
@@ -61,7 +70,15 @@ export const modelProviders = defineProviders({
         },
       },
     }),
-    gateway: gateway("openai/o4-mini"),
+    gateway: ({ features }) => ({
+      model: gateway("openai/o4-mini"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
+    }),
   },
   o3: {
     openai: ({ features }) => ({
@@ -73,22 +90,101 @@ export const modelProviders = defineProviders({
         },
       },
     }),
-    gateway: gateway("openai/o4-mini"),
+    gateway: ({ features }) => ({
+      model: gateway("openai/o3"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
+    }),
+  },
+  "o3-mini": {
+    openai: ({ features }) => ({
+      model: openai.responses("o3-mini"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
+    }),
+    gateway: ({ features }) => ({
+      model: gateway("openai/o3-mini"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: features.thinkSelectRequired?.value ?? "low",
+          //   reasoningSummary: "auto",
+        },
+      },
+    }),
   },
   "claude-3.7-sonnet": {
-    gateway: gateway("anthropic/claude-3.7-sonnet"),
-  },
-  "claude-3.7-sonnet-reasoning": {
-    gateway: gateway("anthropic/claude-3.7-sonnet-reasoning"),
+    anthropic: ({ features }) => ({
+      model: anthropic(
+        features.thinkToggle?.enabled
+          ? "anthropic/claude-3.7-sonnet-reasoning"
+          : "anthropic/claude-3.7-sonnet",
+      ),
+    }),
+    gateway: ({ features }) => ({
+      model: gateway(
+        features.thinkToggle?.enabled
+          ? "anthropic/claude-3.7-sonnet-reasoning"
+          : "anthropic/claude-3.7-sonnet",
+      ),
+    }),
   },
   "claude-3.5-sonnet": {
-    gateway: gateway("anthropic/claude-v3.5-sonnet"),
+    anthropic: ({ features }) => ({
+      model: anthropic(
+        features.thinkToggle?.enabled
+          ? "anthropic/claude-3.5-sonnet-reasoning"
+          : "anthropic/claude-3.5-sonnet",
+      ),
+    }),
+    gateway: ({ features }) => ({
+      model: gateway(
+        features.thinkToggle?.enabled
+          ? "anthropic/claude-3.5-sonnet-reasoning"
+          : "anthropic/claude-3.5-sonnet",
+      ),
+    }),
   },
-  "claude-4-sonnet": {
-    gateway: gateway("anthropic/claude-4-sonnet-20250514"),
+  "claude-sonnet-4": {
+    anthropic: ({ features }) => ({
+      model: anthropic("claude-sonnet-4"),
+      providerOptions: {
+        anthropic: {
+          thinking: features.thinkToggle?.enabled
+            ? { type: "enabled", budgetTokens: 12000 }
+            : { type: "disabled", budgetTokens: 0 },
+        } satisfies AnthropicProviderOptions,
+      },
+    }),
+    gateway: ({ features }) => ({
+      model: gateway("anthropic/claude-4-sonnet-20250514"),
+      providerOptions: {
+        anthropic: {
+          thinking: features.thinkToggle?.enabled
+            ? { type: "enabled", budgetTokens: 12000 }
+            : { type: "disabled", budgetTokens: 0 },
+        } satisfies AnthropicProviderOptions,
+      },
+    }),
   },
-  "claude-4-opus": {
-    gateway: gateway("anthropic/claude-4-opus-20250514"),
+  "claude-opus-4": {
+    gateway: ({ features }) => ({
+      model: gateway("anthropic/claude-4-opus-20250514"),
+      providerOptions: {
+        anthropic: {
+          thinking: features.thinkToggle?.enabled
+            ? { type: "enabled", budgetTokens: 12000 }
+            : { type: "disabled", budgetTokens: 0 },
+        } satisfies AnthropicProviderOptions,
+      },
+    }),
   },
   "grok-3": {
     gateway: gateway("xai/grok-3-beta"),
@@ -97,18 +193,55 @@ export const modelProviders = defineProviders({
     gateway: gateway("xai/grok-3-mini-beta"),
   },
   "gemini-2.0-flash": {
-    gateway: gateway("vertex/gemini-2.0-flash-001"),
+    google: ({ features }) => ({
+      model: google("gemini-2.0-flash"),
+      providerOptions: {
+        google: {
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
+    gateway: ({ features }) => ({
+      model: gateway("vertex/gemini-2.0-flash-001"),
+      providerOptions: {
+        google: {
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
   },
   "gemini-2.0-flash-lite": {
+    google: google("gemini-2.0-flash-lite"),
     gateway: gateway("vertex/gemini-2.0-flash-lite-001"),
   },
   "gemini-2.5-flash": {
+    google: ({ features }) => ({
+      model: google("gemini-2.5-flash-preview-04-17"),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: features.thinkToggle?.enabled ?? false,
+            thinkingBudget: features.thinkToggle?.enabled ? 12000 : 0,
+          },
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
     // gateway: gateway("vertex/gemini-2.5-flash-001"),
   },
-  "gemini-2.5-flash-thinking": {
-    // gateway: gateway("vertex/gemini-2.5-flash-thinking-exp-01-21"),
-  },
   "gemini-2.5-pro": {
+    google: ({ features }) => ({
+      model: google("gemini-2.5-pro-exp-03-25"),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: 12000,
+          },
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
     // gateway: gateway("vertex/gemini-2.5-pro-exp-01-21"),
   },
   "llama-4-scout": {
@@ -120,13 +253,13 @@ export const modelProviders = defineProviders({
   "llama-3.3-70b": {
     gateway: gateway("groq/llama-3.3-70b-versatile"),
   },
-  "deepseek-v3-0324": {
+  "deepseek-v3": {
     gateway: gateway("fireworks/deepseek-v3"),
   },
-  "deepseek-r1-0528": {
-    gateway: gateway("deepseek/deepseek-r1-0528"),
+  "deepseek-r1": {
+    gateway: gateway("fireworks/deepseek-r1"),
   },
-  "deepseek-r1-llama-distilled": {
+  "deepseek-r1-distill": {
     gateway: gateway("groq/deepseek-r1-distill-llama-70b"),
   },
   "qwen-qwq-32b": {

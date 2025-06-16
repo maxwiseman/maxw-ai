@@ -57,7 +57,7 @@ import { ScrollButton } from "@acme/ui/scroll-button";
 import { toast } from "@acme/ui/toast";
 
 import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
-import { models } from "~/lib/models";
+import { defaultModel, models } from "~/lib/models";
 import { blurTransition } from "~/lib/transitions";
 import { fileToFileUIPart } from "~/lib/utils";
 import { branchOff, getChats } from "./chat-actions";
@@ -78,7 +78,7 @@ export function DynamicChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [model, setModel] = useState<ModelId | undefined>("gpt-4.1-nano");
+  const [model, setModel] = useState<ModelId | undefined>(defaultModel);
   const selectedModel = model ? models[model] : undefined;
   const [features, setFeatures] = useState<ModelFeatureResponse>();
   const { messages, stop, status, error, sendMessage, reload } = useChat({

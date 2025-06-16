@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Ellipsis, Globe, Lock, Share, Trash2 } from "lucide-react";
+import { Ellipsis, Trash2 } from "lucide-react";
 
 import type { chat } from "@acme/db/schema";
 import { authClient } from "@acme/auth/client";
@@ -12,9 +12,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@acme/ui/dropdown-menu";
 import { QuickLink } from "@acme/ui/quick-link";
@@ -28,7 +25,6 @@ import {
 } from "@acme/ui/sidebar";
 
 import { deleteChat, getChats } from "./chat-actions";
-import { ChatShareModal } from "./chat-share-modal";
 import { queryClient } from "./query-client";
 
 function SidebarChatsDynamic() {
