@@ -2,7 +2,10 @@ import type { AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
+import { groq } from "@ai-sdk/groq";
 import { openai } from "@ai-sdk/openai";
+import { perplexity } from "@ai-sdk/perplexity";
+import { xai } from "@ai-sdk/xai";
 import { gateway } from "@vercel/ai-sdk-gateway";
 
 import { env } from "~/env";
@@ -20,6 +23,15 @@ export const providerAvailability = defineProviderAvailability({
   },
   google: () => {
     return !!env.GOOGLE_GENERATIVE_AI_API_KEY;
+  },
+  perplexity: () => {
+    return !!env.PERPLEXITY_API_KEY;
+  },
+  groq: () => {
+    return !!env.GROQ_API_KEY;
+  },
+  xai: () => {
+    return !!env.XAI_API_KEY;
   },
 });
 
@@ -120,6 +132,22 @@ export const modelProviders = defineProviders({
       },
     }),
   },
+  sonar: {
+    perplexity: perplexity("sonar"),
+    gateway: gateway("perplexity/sonar"),
+  },
+  "sonar-pro": {
+    perplexity: perplexity("sonar-pro"),
+    gateway: gateway("perplexity/sonar-pro"),
+  },
+  "sonar-reasoning": {
+    perplexity: perplexity("sonar-reasoning"),
+    gateway: gateway("perplexity/sonar-reasoning"),
+  },
+  "sonar-reasoning-pro": {
+    perplexity: perplexity("sonar-reasoning-pro"),
+    gateway: gateway("perplexity/sonar-reasoning-pro"),
+  },
   "claude-3.7-sonnet": {
     anthropic: ({ features }) => ({
       model: anthropic(
@@ -187,9 +215,11 @@ export const modelProviders = defineProviders({
     }),
   },
   "grok-3": {
+    xai: xai("grok-3-latest"),
     gateway: gateway("xai/grok-3-beta"),
   },
   "grok-3-mini": {
+    xai: xai("grok-3-mini-latest"),
     gateway: gateway("xai/grok-3-mini-beta"),
   },
   "gemini-2.0-flash": {
@@ -245,12 +275,15 @@ export const modelProviders = defineProviders({
     // gateway: gateway("vertex/gemini-2.5-pro-exp-01-21"),
   },
   "llama-4-scout": {
+    groq: groq("llama-4-scout-17b-16e-instruct"),
     gateway: gateway("groq/llama-4-scout-17b-16e-instruct"),
   },
   "llama-4-maverick": {
+    groq: groq("meta-llama/llama-4-maverick-17b-128e-instruct"),
     gateway: gateway("vertex/llama-4-maverick-17b-128e-instruct-maas"),
   },
   "llama-3.3-70b": {
+    groq: groq("llama-3.3-70b-versatile"),
     gateway: gateway("groq/llama-3.3-70b-versatile"),
   },
   "deepseek-v3": {
@@ -260,9 +293,11 @@ export const modelProviders = defineProviders({
     gateway: gateway("fireworks/deepseek-r1"),
   },
   "deepseek-r1-distill": {
+    groq: groq("deepseek-r1-distill-llama-70b"),
     gateway: gateway("groq/deepseek-r1-distill-llama-70b"),
   },
   "qwen-qwq-32b": {
+    groq: groq("qwen-qwq-32b"),
     gateway: gateway("groq/qwen-qwq-32b"),
   },
   "qwen-3-32b": {

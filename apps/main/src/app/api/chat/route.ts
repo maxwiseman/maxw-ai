@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       writer.merge(
         result.toUIMessageStream({
           sendReasoning: true,
+          sendSources: true,
           sendFinish: false,
           newMessageId: crypto.randomUUID(),
           originalMessages: data.messages,

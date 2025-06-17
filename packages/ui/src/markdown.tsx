@@ -60,13 +60,9 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   },
   a: function AComponent({ children, ...props }) {
     return (
-      <a
-        className="text-primary inline-flex items-center gap-1 no-underline"
-        {...props}
-        target="_blank"
-      >
+      <a className="text-primary gap-1 no-underline" {...props} target="_blank">
         <span className="underline">{children}</span>
-        <IconExternalLink className="inline-block size-4" />
+        {/* <IconExternalLink className="ml-px inline-block size-4" /> */}
       </a>
     );
   },

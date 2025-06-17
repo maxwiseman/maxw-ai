@@ -27,6 +27,7 @@ import { marked } from "marked";
 import { motion } from "motion/react";
 
 import { authClient } from "@acme/auth/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@acme/ui/avatar";
 import { Button } from "@acme/ui/button";
 import { Card, CardContent, CardHeader } from "@acme/ui/card";
 import {
@@ -65,6 +66,7 @@ import { ChatShareModal } from "./chat-share-modal";
 import { ModelPicker } from "./model-picker";
 import { PromptInputSelect } from "./prompt-input-toggle";
 import { queryClient } from "./query-client";
+import { SourceDetails } from "./source-details";
 
 export function DynamicChat() {
   const params = useParams();
@@ -282,7 +284,8 @@ export function ChatMessage({
   const [likeStatus, setLikeStatus] = useState<"liked" | "disliked" | "none">(
     "none",
   );
-  const notLatestParts = ["data-name", "data-branch"];
+  const notLatestParts = ["data-name", "data-branch", "source-url"];
+  const sources = message.parts.filter((part) => part.type === "source-url");
 
   return (
     <Message
@@ -469,6 +472,30 @@ export function ChatMessage({
                 />
               </Button>
             </MessageAction>
+            {sources.length > 0 && (
+              <SourceDetails sources={sources}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="group flex h-8 w-auto gap-2 rounded-full px-2"
+                >
+                  <div className="*:data-[slot=avatar]:ring-background *:data-[slot=avatar]:ring-background flex -space-x-1 *:data-[slot=avatar]:ring-2">
+                    {sources.slice(0, 3).map((source) => (
+                      <Avatar className="size-4" key={source.url}>
+                        <AvatarImage
+                          className="bg-background object-contain"
+                          src={`https://www.google.com/s2/favicons?domain=${new URL(source.url).hostname}&sz=64`}
+                        />
+                        <AvatarFallback>
+                          {source.title?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <div>Sources</div>
+                </Button>
+              </SourceDetails>
+            )}
           </MessageActions>
         )}
       {(() => {

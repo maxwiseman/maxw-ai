@@ -12,6 +12,7 @@ import {
   GeminiIcon,
   MetaIcon,
   OpenAIIcon,
+  PerplexityIcon,
   QwenIcon,
   xAIIcon,
 } from "@acme/ui/custom-icons";
@@ -51,6 +52,10 @@ export const modelBrands = defineModelBrands({
   gemini: {
     icon: GeminiIcon,
     name: "Google",
+  },
+  perplexity: {
+    icon: PerplexityIcon,
+    name: "Perplexity",
   },
 });
 
@@ -105,6 +110,9 @@ export const modelFeatures = defineModelFeatures({
   },
   searchToggle: {
     option: { type: "toggle", defaultValue: false },
+    display: { icon: Globe, label: "Search", tooltip: "Search the web" },
+  },
+  searchRequired: {
     display: { icon: Globe, label: "Search", tooltip: "Search the web" },
   },
 });
@@ -201,6 +209,38 @@ export const models = defineModels({
     brand: modelBrands.openai,
     url: "https://platform.openai.com/docs/models/o4-mini",
     features: [modelFeatures.thinkSelectRequired],
+  },
+  sonar: {
+    name: "Sonar",
+    description:
+      "Perplexity's lightweight offering with search grounding, quicker and cheaper than Sonar Pro.",
+    brand: modelBrands.perplexity,
+    url: "https://docs.perplexity.ai/models/models/sonar",
+    features: [modelFeatures.searchRequired],
+  },
+  "sonar-pro": {
+    name: "Sonar Pro",
+    description:
+      "Perplexity's premier offering with search grounding, supporting advanced queries and follow-ups.",
+    brand: modelBrands.perplexity,
+    url: "https://docs.perplexity.ai/models/models/sonar-pro",
+    features: [modelFeatures.searchRequired],
+  },
+  "sonar-reasoning": {
+    name: "Sonar Reasoning",
+    description:
+      "A reasoning-focused model that outputs Chain of Thought (CoT) in responses, providing detailed explanations with search grounding.",
+    brand: modelBrands.perplexity,
+    url: "https://docs.perplexity.ai/models/models/sonar-reasoning",
+    features: [modelFeatures.searchRequired, modelFeatures.thinkRequired],
+  },
+  "sonar-reasoning-pro": {
+    name: "Sonar Reasoning Pro",
+    description:
+      "A premium reasoning-focused model that outputs Chain of Thought (CoT) in responses, providing comprehensive explanations with enhanced search capabilities and multiple search queries per request.",
+    brand: modelBrands.perplexity,
+    url: "https://docs.perplexity.ai/models/models/sonar-reasoning-pro",
+    features: [modelFeatures.searchRequired, modelFeatures.thinkRequired],
   },
   "claude-opus-4": {
     name: "Claude Opus 4",
