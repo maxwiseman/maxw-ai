@@ -1,6 +1,5 @@
 import type { Components } from "react-markdown";
 import { memo, useId, useMemo } from "react";
-import { IconExternalLink } from "@tabler/icons-react";
 import { marked } from "marked";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -31,6 +30,7 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   code: function CodeComponent({ className, children, ...props }) {
     const isInline =
       !props.node?.position?.start.line ||
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       props.node?.position?.start.line === props.node?.position?.end.line;
 
     if (isInline) {

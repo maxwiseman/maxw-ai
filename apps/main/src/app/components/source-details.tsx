@@ -1,10 +1,11 @@
 import type { SourceUrlUIPart } from "ai";
-import type { SuccessResult } from "open-graph-scraper-lite";
 import { useQuery } from "@tanstack/react-query";
 
 import { Avatar, AvatarImage } from "@acme/ui/avatar";
 import { Button } from "@acme/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@acme/ui/popover";
+
+import { getSourceDetails } from "./source-actions";
 
 export function SourceDetails({
   children,
@@ -17,13 +18,7 @@ export function SourceDetails({
     staleTime: Infinity,
     gcTime: Infinity,
     queryKey: ["source-details", ...sources.map((source) => source.url)],
-    queryFn: () =>
-      fetch("/api/source-details", {
-        method: "POST",
-        body: JSON.stringify(sources),
-      }).then(
-        (res) => res.json() as Promise<(SourceUrlUIPart & SuccessResult)[]>,
-      ),
+    queryFn: () => getSourceDetails(sources),
   });
   console.log("source details", data);
 
@@ -45,10 +40,10 @@ export function SourceDetails({
                 className="flex h-auto w-full items-start justify-start gap-2 px-2 py-2 text-left whitespace-normal"
               >
                 <a target="_blank" href={source.url}>
-                  <Avatar className="relative top-1 size-6">
+                  <Avatar className="relative top-1 size-6 rounded-sm">
                     <AvatarImage
                       className="object-contain"
-                      src={`https://www.google.com/s2/favicons?domain=${new URL(source.url).hostname}&sz=512`}
+                      src={`https://www.google.com/s2/favicons?domain=${new URL(source.url).hostname}&sz=64`}
                     />
                   </Avatar>
                   <div>

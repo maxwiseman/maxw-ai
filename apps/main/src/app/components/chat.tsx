@@ -483,7 +483,7 @@ export function ChatMessage({
                     {sources.slice(0, 3).map((source) => (
                       <Avatar className="size-4" key={source.url}>
                         <AvatarImage
-                          className="bg-background object-contain"
+                          className="bg-background object-fill"
                           src={`https://www.google.com/s2/favicons?domain=${new URL(source.url).hostname}&sz=64`}
                         />
                         <AvatarFallback>
