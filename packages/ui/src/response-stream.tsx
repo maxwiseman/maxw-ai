@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "src/lib/utils";
+
+import { cn } from ".";
 
 export type Mode = "typewriter" | "fade";
 
-export type UseTextStreamOptions = {
+export interface UseTextStreamOptions {
   textStream: string | AsyncIterable<string>;
   speed?: number;
   mode?: Mode;
@@ -14,9 +15,9 @@ export type UseTextStreamOptions = {
   segmentDelay?: number;
   characterChunkSize?: number;
   onError?: (error: unknown) => void;
-};
+}
 
-export type UseTextStreamResult = {
+export interface UseTextStreamResult {
   displayedText: string;
   isComplete: boolean;
   segments: { text: string; index: number }[];
@@ -26,7 +27,7 @@ export type UseTextStreamResult = {
   startStreaming: () => void;
   pause: () => void;
   resume: () => void;
-};
+}
 
 function useTextStream({
   textStream,
@@ -276,7 +277,7 @@ function useTextStream({
   };
 }
 
-export type ResponseStreamProps = {
+export interface ResponseStreamProps {
   textStream: string | AsyncIterable<string>;
   mode?: Mode;
   speed?: number; // 1-100, where 1 is slowest and 100 is fastest
@@ -286,7 +287,7 @@ export type ResponseStreamProps = {
   fadeDuration?: number; // Custom fade duration in ms (overrides speed)
   segmentDelay?: number; // Custom delay between segments in ms (overrides speed)
   characterChunkSize?: number; // Custom characters per frame for typewriter mode (overrides speed)
-};
+}
 
 function ResponseStream({
   textStream,
@@ -386,7 +387,7 @@ function ResponseStream({
     }
   };
 
-  const Container = as as keyof React.JSX.IntrinsicElements;
+  const Container = as;
 
   return <Container className={className}>{renderContent()}</Container>;
 }

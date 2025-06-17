@@ -11,8 +11,8 @@
     "plugins": [{ "name": "next" }],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": []
+    "types": ["node", "react", "react-dom"]
   },
-  "include": [".", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [".", ".next/types/**/*.ts", "next-env.d.ts"],
+  "exclude": ["node_modules", "eslint.config.js"]
 }
