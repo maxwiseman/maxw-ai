@@ -239,7 +239,7 @@ export function AuthCard() {
           Sign in with GitHub
         </Button>
       </CardContent>
-      <CardFooter className="bg-muted/60 shadow-inset-lg flex items-center justify-end gap-2 border-t p-6 py-4">
+      <CardFooter className="bg-muted/60 shadow-inset-lg flex items-center justify-end gap-2 border-t p-6 py-4 pt-4">
         <Button
           onClick={() => {
             setMode((prev) => (prev === "sign-in" ? "sign-up" : "sign-in"));

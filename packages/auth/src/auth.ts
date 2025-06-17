@@ -54,6 +54,7 @@ export const config = {
   advanced: {
     crossSubDomainCookies: {
       enabled: true,
+      domain: ".maxw.ai",
     },
   },
 } satisfies BetterAuthOptions;
