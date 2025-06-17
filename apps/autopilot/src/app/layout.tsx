@@ -4,18 +4,14 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
 import { cn } from "@acme/ui";
-import { ThemeProvider } from "@acme/ui/theme";
+import { ThemeProvider, ThemeToggle } from "@acme/ui/theme";
 import { Toaster } from "@acme/ui/toast";
 
 import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/app/globals.css";
 
-import { SidebarInset, SidebarProvider } from "@acme/ui/sidebar";
-
 import { env } from "~/env";
-import { AppSidebar } from "./app-sidebar";
-import { QueryClientProvider } from "./components/query-client";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -23,7 +19,7 @@ export const metadata: Metadata = {
       ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
       : "http://localhost:3000",
   ),
-  title: "Max's AI",
+  title: "Autopilot",
 };
 
 export const viewport: Viewport = {
@@ -44,14 +40,10 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TRPCReactProvider>
-            <QueryClientProvider>
-              <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset>{props.children}</SidebarInset>
-              </SidebarProvider>
-            </QueryClientProvider>
-          </TRPCReactProvider>
+          <TRPCReactProvider>{props.children}</TRPCReactProvider>
+          <div className="absolute right-4 bottom-4">
+            <ThemeToggle />
+          </div>
           <Toaster />
         </ThemeProvider>
         <Analytics />

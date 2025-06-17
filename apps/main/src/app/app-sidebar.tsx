@@ -1,5 +1,6 @@
 import { ArrowUpRight, Gauge, Plane } from "lucide-react";
 
+import { AuthButton } from "@acme/ui/auth-modal";
 import { QuickLink } from "@acme/ui/quick-link";
 import {
   Sidebar,
@@ -12,18 +13,18 @@ import {
   SidebarMenuItem,
 } from "@acme/ui/sidebar";
 
-import { AuthButton } from "./components/auth-modal";
+import { env } from "~/env";
 import { SidebarChats } from "./components/sidebar-chats";
 
 export function AppSidebar() {
   const externalLinks = [
     {
-      href: "https://rapidgrader.maxw.ai",
+      href: `https://rapidgrader.${env.VERCEL_PROJECT_PRODUCTION_URL}`,
       label: "RapidGrader",
       icon: Gauge,
     },
     {
-      href: "https://autopilot.maxw.ai",
+      href: `https://autopilot.${env.VERCEL_PROJECT_PRODUCTION_URL}`,
       label: "AutoPilot",
       icon: Plane,
     },

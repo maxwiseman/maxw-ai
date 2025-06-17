@@ -13,11 +13,6 @@
     "moduleResolution": "bundler",
     "types": ["node", "react", "react-dom"]
   },
-  "include": [
-    ".",
-    ".next/types/**/*.ts",
-    "next-env.d.ts",
-    "../../packages/ui/src/auth-modal.tsx"
-  ],
+  "include": [".", ".next/types/**/*.ts", "next-env.d.ts"],
   "exclude": ["node_modules", "eslint.config.js"]
 }

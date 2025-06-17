@@ -12,10 +12,23 @@ export const user = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
-    emailVerified: integer("email_verified", { mode: "boolean" }).notNull(),
+    emailVerified: integer("email_verified", { mode: "boolean" })
+      .$defaultFn(() => false)
+      .notNull(),
     image: text("image"),
-    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .$defaultFn(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .$defaultFn(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    invitedTo: text("invited_to", { mode: "json" })
+      .$type<string[]>()
+      .default(["main"])
+      .notNull(),
+    invitesRemaining: integer("invites_remaining", { mode: "number" })
+      .default(0)
+      .notNull(),
   },
   (table) => [
     uniqueIndex("user_id_index").on(table.id),
@@ -35,11 +48,11 @@ export const session = sqliteTable(
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => [
+    uniqueIndex("session_id_index").on(table.id),
     index("session_user_id_index").on(table.userId),
-    index("session_token_index").on(table.token),
   ],
 );
 
@@ -51,7 +64,7 @@ export const account = sqliteTable(
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -67,9 +80,10 @@ export const account = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [
-    uniqueIndex("account_account_id_index").on(table.accountId),
-    index("account_user_id_index").on(table.userId),
+    uniqueIndex("account_id_index").on(table.id),
+    index("account_acc_id_index").on(table.accountId),
     index("account_provider_id_index").on(table.providerId),
+    index("account_user_id_index").on(table.userId),
   ],
 );
 
@@ -80,8 +94,15 @@ export const verification = sqliteTable(
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
     expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp" }),
-    updatedAt: integer("updated_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+      () => /* @__PURE__ */ new Date(),
+    ),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
+      () => /* @__PURE__ */ new Date(),
+    ),
   },
-  (table) => [uniqueIndex("verification_id_index").on(table.identifier)],
+  (table) => [
+    uniqueIndex("verification_id_index").on(table.id),
+    index("verification_identifier_index").on(table.identifier),
+  ],
 );

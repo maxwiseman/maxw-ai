@@ -15,6 +15,7 @@ import {
 } from "@acme/ui/dialog";
 import { Input } from "@acme/ui/input";
 
+import { env } from "~/env";
 import { createChatShare, deleteChatShare } from "./chat-actions";
 
 export function ChatShareModal({
@@ -53,7 +54,9 @@ export function ChatShareModalContent({
   useEffect(() => {
     if (shareQuery.data)
       navigator.clipboard
-        .writeText(`https://maxw.ai/share/${shareQuery.data}`)
+        .writeText(
+          `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/share/${shareQuery.data}`,
+        )
         .then(() => {
           setIsCopied(true);
         })
@@ -83,7 +86,7 @@ export function ChatShareModalContent({
           className="rounded-full p-5 px-4 pr-12 !text-base"
           value={
             shareQuery.data
-              ? `https://maxw.ai/share/${shareQuery.data}`
+              ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/share/${shareQuery.data}`
               : "Loading..."
           }
           readOnly

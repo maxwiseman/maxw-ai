@@ -1,0 +1,4 @@
+*.pdf
+output.*
+tmp/
+screenshot.*

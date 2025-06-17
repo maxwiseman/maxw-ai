@@ -2,13 +2,23 @@
 
 import type React from "react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogOut, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { authClient } from "@acme/auth/client";
-import { Avatar, AvatarFallback, AvatarImage } from "@acme/ui/avatar";
-import { Button } from "@acme/ui/button";
-import { GithubIcon } from "@acme/ui/custom-icons";
+
+import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
+import { Button } from "./button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "./card";
+import { GithubIcon } from "./custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@acme/ui/dialog";
+} from "./dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,10 +38,10 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@acme/ui/dropdown-menu";
-import { Input } from "@acme/ui/input";
-import { Separator } from "@acme/ui/separator";
-import { Skeleton } from "@acme/ui/skeleton";
+} from "./dropdown-menu";
+import { Input } from "./input";
+import { Separator } from "./separator";
+import { Skeleton } from "./skeleton";
 
 export function AuthModal({ children }: { children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -140,6 +150,110 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function AuthCard() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const router = useRouter();
+
+  async function handleKeyPress(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      await handleSubmit();
+    }
+  }
+  async function handleSubmit() {
+    setIsLoading(true);
+    if (mode === "sign-in") {
+      const data = await authClient.signIn.email({
+        email,
+        password,
+      });
+      if (data.error) {
+        setError(data.error.message);
+      }
+    } else {
+      const data = await authClient.signUp.email({
+        name,
+        email,
+        password,
+      });
+      if (data.error) {
+        setError(data.error.message);
+      }
+    }
+    setIsLoading(false);
+    router.push("/");
+  }
+
+  return (
+    <Card className="w-sm pb-0">
+      <CardHeader>
+        <CardTitle>{mode === "sign-in" ? "Sign in" : "Sign up"}</CardTitle>
+        <CardDescription>
+          {mode === "sign-in"
+            ? "Sign in to your account"
+            : "Sign up for an account"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {mode === "sign-up" && (
+          <Input
+            onKeyDown={handleKeyPress}
+            disabled={isLoading}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            type="name"
+            placeholder="Name"
+          />
+        )}
+        <Input
+          onKeyDown={handleKeyPress}
+          disabled={isLoading}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          placeholder="Email"
+        />
+        <Input
+          onKeyDown={handleKeyPress}
+          disabled={isLoading}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          type="password"
+          placeholder="Password"
+        />
+        {error && <p className="text-destructive text-sm">{error}</p>}
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Separator className="shrink grow" />
+          <span className="relative -top-px whitespace-nowrap">or</span>
+          <Separator className="shrink grow" />
+        </div>
+        <Button disabled variant="outline" className="w-full">
+          <GithubIcon />
+          Sign in with GitHub
+        </Button>
+      </CardContent>
+      <CardFooter className="bg-muted/60 shadow-inset-lg flex items-center justify-end gap-2 border-t p-6 py-4">
+        <Button
+          onClick={() => {
+            setMode((prev) => (prev === "sign-in" ? "sign-up" : "sign-in"));
+          }}
+          disabled={isLoading}
+          variant="outline"
+        >
+          Sign {mode === "sign-in" ? "up" : "in"}
+        </Button>
+        <Button disabled={isLoading} onClick={handleSubmit}>
+          Sign {mode === "sign-in" ? "in" : "up"}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 

@@ -1,0 +1,131 @@
+/* Base  
+–––––––––––––––––––––––––––––––––––––––– */
+body {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: #333;
+  margin: 0;
+  padding: 0in; /* matches your PDF page margin */
+  background: #fff;
+}
+
+/* Headings  
+    –––––––––––––––––––––––––––––––––––––––– */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: bold;
+  margin: 1.2em 0 0.6em;
+  line-height: 1.25;
+}
+h1 {
+  font-size: 24pt;
+  border-bottom: 2px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+h2 {
+  font-size: 20pt;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.2em;
+}
+h3 {
+  font-size: 16pt;
+}
+h4 {
+  font-size: 14pt;
+}
+h5 {
+  font-size: 12pt;
+}
+h6 {
+  font-size: 10pt;
+}
+
+/* Paragraphs & Lists  
+    –––––––––––––––––––––––––––––––––––––––– */
+p,
+ul,
+ol,
+dl {
+  margin: 0.5em 0;
+}
+ul,
+ol {
+  padding-left: 1.2em;
+}
+li {
+  margin: 0.3em 0;
+}
+
+/* Blockquotes  
+    –––––––––––––––––––––––––––––––––––––––– */
+blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  color: #555;
+  background: #f9f9f9;
+  border-left: 4px solid #ccc;
+}
+
+/* Code & Pre  
+    –––––––––––––––––––––––––––––––––––––––– */
+code {
+  font-family: Menlo, Consolas, monospace;
+  background: #f5f5f5;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+pre {
+  font-family: Menlo, Consolas, monospace;
+  background: #f5f5f5;
+  padding: 1em;
+  overflow-x: auto;
+  border-radius: 3px;
+  margin: 1em 0;
+}
+
+/* Tables  
+    –––––––––––––––––––––––––––––––––––––––– */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 0.5em 1em;
+  text-align: left;
+}
+th {
+  background: #f0f0f0;
+}
+tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Links, Images, HR  
+    –––––––––––––––––––––––––––––––––––––––– */
+a {
+  color: #0366d6;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+  margin: 1em 0;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #eaecef;
+  margin: 2em 0;
+}
