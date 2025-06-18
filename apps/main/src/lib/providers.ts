@@ -1,12 +1,14 @@
 import type { AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
+import { deepseek } from "@ai-sdk/deepseek";
 import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { openai } from "@ai-sdk/openai";
 import { perplexity } from "@ai-sdk/perplexity";
 import { xai } from "@ai-sdk/xai";
 import { gateway } from "@vercel/ai-sdk-gateway";
+import { extractReasoningMiddleware, wrapLanguageModel } from "ai";
 
 import { env } from "~/env";
 import { defineProviderAvailability, defineProviders } from "./provider-utils";
@@ -32,6 +34,9 @@ export const providerAvailability = defineProviderAvailability({
   },
   xai: () => {
     return !!env.XAI_API_KEY;
+  },
+  deepseek: () => {
+    return !!env.DEEPSEEK_API_KEY;
   },
 });
 
@@ -286,15 +291,30 @@ export const modelProviders = defineProviders({
     gateway: gateway("fireworks/deepseek-v3"),
   },
   "deepseek-r1": {
-    gateway: gateway("fireworks/deepseek-r1"),
+    gateway: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: gateway("fireworks/deepseek-r1"),
+    }),
   },
   "deepseek-r1-distill": {
-    groq: groq("deepseek-r1-distill-llama-70b"),
-    gateway: gateway("groq/deepseek-r1-distill-llama-70b"),
+    groq: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: groq("deepseek-r1-distill-llama-70b"),
+    }),
+    gateway: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: gateway("groq/deepseek-r1-distill-llama-70b"),
+    }),
   },
   "qwen-qwq-32b": {
-    groq: groq("qwen-qwq-32b"),
-    gateway: gateway("groq/qwen-qwq-32b"),
+    groq: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: groq("qwen-qwq-32b"),
+    }),
+    gateway: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: gateway("groq/qwen-qwq-32b"),
+    }),
   },
   "qwen-3-32b": {
     gateway: gateway("cerebras/qwen-3-32b"),

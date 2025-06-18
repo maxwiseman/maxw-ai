@@ -98,6 +98,7 @@
         "@acme/ui": "workspace:*",
         "@acme/validators": "workspace:*",
         "@ai-sdk/anthropic": "2.0.0-alpha.10",
+        "@ai-sdk/deepseek": "1.0.0-alpha.10",
         "@ai-sdk/google": "2.0.0-alpha.10",
         "@ai-sdk/google-vertex": "3.0.0-alpha.10",
         "@ai-sdk/groq": "2.0.0-alpha.10",
@@ -249,7 +250,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@libsql/client": "^0.15.8",
-        "@types/crypto-js": "^4.2.2",
         "@vercel/postgres": "^0.10.0",
         "crypto-js": "^4.2.0",
         "drizzle-orm": "^0.44.1",
@@ -260,6 +260,7 @@
         "@acme/eslint-config": "workspace:*",
         "@acme/prettier-config": "workspace:*",
         "@acme/tsconfig": "workspace:*",
+        "@types/crypto-js": "^4.2.2",
         "dotenv-cli": "^8.0.0",
         "drizzle-kit": "^0.31.1",
         "eslint": "^9.28.0",
@@ -420,6 +421,8 @@
     "@acme/validators": ["@acme/validators@workspace:packages/validators"],
 
     "@ai-sdk/anthropic": ["@ai-sdk/anthropic@2.0.0-alpha.10", "", { "dependencies": { "@ai-sdk/provider": "2.0.0-alpha.10", "@ai-sdk/provider-utils": "3.0.0-alpha.10" }, "peerDependencies": { "zod": "^3.25.49" } }, "sha512-Dc14+rjX0p1jeks/CN/MGLAJuIybINaw+RaunTxijMBaGxOb/IL+1a9lxMTnRr/pMgzWdo3OAQMPIWVn13rnZg=="],
+
+    "@ai-sdk/deepseek": ["@ai-sdk/deepseek@1.0.0-alpha.10", "", { "dependencies": { "@ai-sdk/openai-compatible": "1.0.0-alpha.10", "@ai-sdk/provider": "2.0.0-alpha.10", "@ai-sdk/provider-utils": "3.0.0-alpha.10" }, "peerDependencies": { "zod": "^3.25.49" } }, "sha512-9Wv4Z7FN4y9PYDwxPA9D38FNCso/v7d3sfKmmlstLsrFvM8qw/jRq+XFJYpCytAuBYbD8d06OFW4IocsP4jP6A=="],
 
     "@ai-sdk/gateway": ["@ai-sdk/gateway@1.0.0-alpha.10", "", { "dependencies": { "@ai-sdk/provider": "2.0.0-alpha.10", "@ai-sdk/provider-utils": "3.0.0-alpha.10" }, "peerDependencies": { "zod": "^3.25.49" } }, "sha512-zzz0qDz2HGwPNZpwSYkTpTmkkOWwT82c2xgQCGcP2uxs2sgOHPQDAj4yPrLhSAtr3KD7MJyXJ0P3oIfZQS5L0Q=="],
 

@@ -25,6 +25,7 @@ export const env = createEnv({
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
     PERPLEXITY_API_KEY: z.string().optional(),
     GROQ_API_KEY: z.string().optional(),
+    DEEPSEEK_API_KEY: z.string().optional(),
   },
 
   /**

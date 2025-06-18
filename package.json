@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "build:main": "turbo run build -F @acme/main...",
     "clean": "git clean -xdf node_modules",
     "clean:workspaces": "turbo run clean",
     "db:push": "turbo -F @acme/db push",
