@@ -4,6 +4,8 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { oAuthProxy } from "better-auth/plugins";
 
+// import { passkey } from "better-auth/plugins/passkey";
+
 import { db } from "@acme/db/client";
 
 import { env } from "../env";
@@ -35,7 +37,21 @@ export const config = {
     },
   },
   secret: env.AUTH_SECRET,
-  plugins: [oAuthProxy(), expo()],
+  plugins: [
+    oAuthProxy(),
+    expo(),
+    // passkey({
+    //   rpID: env.VERCEL_PROJECT_PRODUCTION_URL ?? "localhost",
+    //   rpName: "maxw.ai",
+    //   origin: env.VERCEL_PROJECT_PRODUCTION_URL
+    //     ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
+    //     : "http://localhost:3000",
+    //   authenticatorSelection: {
+    //     residentKey: "required",
+    //     userVerification: "preferred",
+    //   },
+    // }),
+  ],
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,

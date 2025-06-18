@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./card";
-import { GithubIcon } from "./custom-icons";
+import { GithubIcon, PasskeyIcon } from "./custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +63,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
       const data = await authClient.signIn.email({
         email,
         password,
+        rememberMe: true,
       });
       if (data.error) {
         setError(data.error.message);
@@ -102,7 +103,8 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
                 disabled={isLoading}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                type="name"
+                autoComplete="name"
+                type="text"
                 placeholder="Name"
               />
             )}
@@ -111,6 +113,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
               disabled={isLoading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               type="email"
               placeholder="Email"
             />
@@ -119,6 +122,9 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
               disabled={isLoading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete={
+                mode === "sign-in" ? "current-password" : "new-password"
+              }
               type="password"
               placeholder="Password"
             />
@@ -130,8 +136,8 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
             <Separator className="shrink grow" />
           </div>
           <Button disabled variant="outline" className="w-full">
-            <GithubIcon />
-            Sign in with GitHub
+            <PasskeyIcon className="size-5" />
+            Sign in with Passkey
           </Button>
         </div>
         <DialogFooter className="bg-muted/60 shadow-inset-lg border-t p-6 py-4">
@@ -173,6 +179,7 @@ export function AuthCard() {
       const data = await authClient.signIn.email({
         email,
         password,
+        rememberMe: true,
       });
       if (data.error) {
         setError(data.error.message);
@@ -208,7 +215,8 @@ export function AuthCard() {
             disabled={isLoading}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            type="name"
+            autoComplete="name"
+            type="text"
             placeholder="Name"
           />
         )}
@@ -217,6 +225,7 @@ export function AuthCard() {
           disabled={isLoading}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           type="email"
           placeholder="Email"
         />
@@ -225,6 +234,9 @@ export function AuthCard() {
           disabled={isLoading}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete={
+            mode === "sign-in" ? "current-password" : "new-password"
+          }
           type="password"
           placeholder="Password"
         />
@@ -235,8 +247,8 @@ export function AuthCard() {
           <Separator className="shrink grow" />
         </div>
         <Button disabled variant="outline" className="w-full">
-          <GithubIcon />
-          Sign in with GitHub
+          <PasskeyIcon className="size-5" />
+          Sign in with Passkey
         </Button>
       </CardContent>
       <CardFooter className="bg-muted/60 shadow-inset-lg flex items-center justify-end gap-2 border-t p-6 py-4 pt-4">

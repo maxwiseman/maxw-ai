@@ -106,3 +106,28 @@ export const verification = sqliteTable(
     index("verification_identifier_index").on(table.identifier),
   ],
 );
+
+export const passkey = sqliteTable(
+  "passkey",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    publicKey: text("public_key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    credentialID: text("credential_id").notNull(),
+    counter: integer("counter").notNull(),
+    deviceType: text("device_type").notNull(),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+    transports: text("transports"),
+    createdAt: integer("created_at", { mode: "timestamp" }),
+    aaguid: text("aaguid"),
+  },
+  (table) => [
+    uniqueIndex("passkey_id_index").on(table.id),
+    index("passkey_user_id_index").on(table.userId),
+    index("passkey_credential_id_index").on(table.credentialID),
+    index("passkey_public_key_index").on(table.publicKey),
+  ],
+);
