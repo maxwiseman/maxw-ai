@@ -117,7 +117,7 @@ export const modelFeatures = defineModelFeatures({
   },
 });
 
-export const defaultModel: ModelId = "gpt-4.1-nano";
+export const defaultModel: ModelId = "gemini-2.5-flash-lite";
 
 export const models = defineModels({
   "gemini-2.5-flash-lite": {

@@ -55,7 +55,7 @@ export function ChatShareModalContent({
     if (shareQuery.data)
       navigator.clipboard
         .writeText(
-          `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/share/${shareQuery.data}`,
+          `https://${env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ?? "localhost:3000"}/share/${shareQuery.data}`,
         )
         .then(() => {
           setIsCopied(true);
@@ -86,7 +86,7 @@ export function ChatShareModalContent({
           className="rounded-full p-5 px-4 pr-12 !text-base"
           value={
             shareQuery.data
-              ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/share/${shareQuery.data}`
+              ? `https://${env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ?? "localhost:3000"}/share/${shareQuery.data}`
               : "Loading..."
           }
           readOnly
