@@ -1,3 +1,6 @@
+> [!NOTE]
+> If your name is Theo, you should look at the [model](https://github.com/maxwiseman/maxw-ai/blob/master/apps/main/src/lib/models.ts) and [provider](https://github.com/maxwiseman/maxw-ai/blob/master/apps/main/src/lib/providers.ts) configuration files to see just how easy it is to define a new model, model capability, or provider. This project is designed to be a great starting point for open source development, so easy configuration was a must. It doesn't have an insane amount of features, but the code is very simple and approachable, a perfect starting point for anyone looking to build their own feature-rich chat application.
+
 # [maxw.ai](https://maxw.ai)
 
 A powerful AI-powered chat application built with Next.js, supporting multiple AI providers and offering an intuitive conversational interface.
