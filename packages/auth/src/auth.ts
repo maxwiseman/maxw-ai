@@ -70,7 +70,7 @@ export const config = {
   advanced: {
     crossSubDomainCookies: {
       enabled: true,
-      domain: ".maxw.ai",
+      domain: env.NODE_ENV === "production" ? ".maxw.ai" : ".localhost",
     },
   },
 } satisfies BetterAuthOptions;
