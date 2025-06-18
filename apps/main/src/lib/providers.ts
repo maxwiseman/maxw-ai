@@ -222,31 +222,27 @@ export const modelProviders = defineProviders({
     xai: xai("grok-3-mini-latest"),
     gateway: gateway("xai/grok-3-mini-beta"),
   },
-  "gemini-2.0-flash": {
+  "gemini-2.5-flash-lite": {
     google: ({ features }) => ({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash-lite-preview-06-17"),
       providerOptions: {
         google: {
           useSearchGrounding: features.searchToggle?.enabled ?? false,
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    gateway: ({ features }) => ({
-      model: gateway("vertex/gemini-2.0-flash-001"),
-      providerOptions: {
-        google: {
-          useSearchGrounding: features.searchToggle?.enabled ?? false,
-        } satisfies GoogleGenerativeAIProviderOptions,
-      },
-    }),
-  },
-  "gemini-2.0-flash-lite": {
-    google: google("gemini-2.0-flash-lite"),
-    gateway: gateway("vertex/gemini-2.0-flash-lite-001"),
+    // gateway: ({ features }) => ({
+    //   model: gateway("vertex/gemini-2.5-flash-lite-preview-06-17"),
+    //   providerOptions: {
+    //     google: {
+    //       useSearchGrounding: features.searchToggle?.enabled ?? false,
+    //     } satisfies GoogleGenerativeAIProviderOptions,
+    //   },
+    // }),
   },
   "gemini-2.5-flash": {
     google: ({ features }) => ({
-      model: google("gemini-2.5-flash-preview-04-17"),
+      model: google("gemini-2.5-flash"),
       providerOptions: {
         google: {
           thinkingConfig: {
@@ -257,11 +253,11 @@ export const modelProviders = defineProviders({
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    // gateway: gateway("vertex/gemini-2.5-flash-001"),
+    // gateway: gateway("vertex/gemini-2.5-flash"),
   },
   "gemini-2.5-pro": {
     google: ({ features }) => ({
-      model: google("gemini-2.5-pro-exp-03-25"),
+      model: google("gemini-2.5-pro"),
       providerOptions: {
         google: {
           thinkingConfig: {
@@ -272,7 +268,7 @@ export const modelProviders = defineProviders({
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    // gateway: gateway("vertex/gemini-2.5-pro-exp-01-21"),
+    // gateway: gateway("vertex/gemini-2.5-pro"),
   },
   "llama-4-scout": {
     groq: groq("llama-4-scout-17b-16e-instruct"),
