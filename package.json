@@ -19,6 +19,7 @@
     "db:push": "turbo -F @acme/db push",
     "auth:generate": "bun -F @acme/auth generate",
     "db:studio": "turbo -F @acme/db studio",
+    "start:autopilot-backend": "turbo run dev --filter=@acme/autopilot-backend...",
     "dev": "turbo watch dev --continue",
     "dev:main": "turbo watch dev -F @acme/main...",
     "dev:autopilot": "turbo run dev --parallel --filter=@acme/autopilot-backend... --filter=@acme/autopilot...",
