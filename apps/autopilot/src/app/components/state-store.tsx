@@ -25,7 +25,7 @@ export const useStateStore = create<AutopilotState>()((set) => ({
 }));
 
 export function useLiveState() {
-  const ws = useWebsocket(`${env.NEXT_PUBLIC_BACKEND_URL}/ws`, {
+  const ws = useWebsocket(`/backend/ws`, {
     reconnectAttempts: 3,
     shouldReconnect: () => true,
   });

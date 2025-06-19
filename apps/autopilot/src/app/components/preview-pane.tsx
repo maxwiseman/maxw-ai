@@ -21,7 +21,7 @@ export function PreviewPane() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="rounded-md border shadow-xl/2"
-            src={`${env.NEXT_PUBLIC_BACKEND_URL}/mjpeg`}
+            src={`/backend/mjpeg`}
           />
         </>
       ) : (
