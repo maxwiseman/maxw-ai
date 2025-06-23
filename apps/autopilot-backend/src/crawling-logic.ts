@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-/* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import * as fs from "fs/promises";
 import type { OpenAIProviderOptions } from "@ai-sdk/openai/internal";
-import type { ElementHandle, Frame, Page } from "puppeteer";
+import type { Frame, Page } from "puppeteer";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText } from "ai";
 import { sleep } from "bun";
@@ -16,184 +15,350 @@ import { configuration } from "@acme/db/schema";
 import type { WSServerMessageSchema } from "./message-schema";
 import { downloadFile, waitAndClick, waitAndType } from "./utils";
 
-export async function startCrawling({
-  userPage,
-  userId,
-  sendMessage,
-}: {
+// Constants
+const LOGIN_URL =
+  "https://account.activedirectory.windowsazure.com/applications/signin/6be35607-d39b-4ec5-8b6f-bb7ec0fdc57a?tenantId=a2c165ce-3db2-4317-b742-8b26460ec108";
+const TIMEOUTS = {
+  DEFAULT: 10000,
+  DUPLICATE_SESSION: 3000,
+  FRAME_PROGRESS: 3000,
+  NAVIGATION_DELAY: 1000,
+  AUDIO_BUTTON: 15000,
+  VIDEO_COMPLETION: 500,
+  FORM_SUBMISSION: 500,
+} as const;
+
+const SELECTORS = {
+  EMAIL_INPUT: 'input[type="email"]',
+  PASSWORD_INPUT: 'input[type="password"]',
+  SUBMIT_BUTTON: 'input[type="submit"]',
+  DISPLAY_NAME: "#displayName",
+  HEADING: '[role="heading"]',
+  DUPLICATE_SESSION: ".duplicate-session-main-header",
+  CONTINUE_BUTTON: 'input[value="Continue"]',
+  NEXT_ACTIVITY: 'a[title="Next Activity"]',
+  ACTIVITY_TITLE: "#activity-title",
+  STAGE_FRAME: "#stageFrame",
+  FRAME_PROGRESS: "#frameProgress",
+  IFRAME_PREVIEW: "#iFramePreview",
+  FRAME_RIGHT: ".FrameRight",
+  FOOTNAV_RIGHT: ".footnav.goRight:not(.disabled)",
+  VIDEO_PAUSE: "li.pause",
+  VIDEO_PLAY: "li.play",
+  PDF_LINKS: "a:has(.icon-doc-pdf)",
+  CONTENT_CONTAINER: ".content,.question-container",
+  INLINE_FIELD: ".inline-field",
+  INVIS_DIV: "#invis-o-div",
+  CHECK_BUTTON: "#btnCheck",
+  AUDIO_BUTTON: "#btnEntryAudio",
+  EXIT_AUDIO_BUTTON: "#btnExitAudio",
+  NAV_BUTTON_LIST: "#navBtnList",
+  FILE_INPUT: 'input[type="file"]',
+  INSTRUCTION_LINK: '#iFramePreview .content a[target="_blank"]',
+} as const;
+
+// Types
+type InputType =
+  | { type: "input" }
+  | { type: "textarea" }
+  | { type: "checkbox"; label: string }
+  | { type: "radio"; label: string }
+  | { type: "select"; options: string[] };
+
+export type ActivityType = "Quiz" | "Video" | "Instructions" | "QuickCheck";
+
+interface AutomationConfig {
   userPage: Page;
   userId: string;
   sendMessage: (data: z.infer<typeof WSServerMessageSchema>) => void;
   signal?: AbortSignal;
-}) {
+}
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+/**
+ * Main entry point for the educational platform automation system
+ */
+export async function startEducationalAutomation(config: AutomationConfig) {
+  const { userPage, userId, sendMessage } = config;
+
+  // Notify that automation is starting
   sendMessage({ type: "newState", state: { status: "running" } });
 
-  const activityCompleter = {
-    instruction: async (activityFrame: Frame) => {
-      await sleep(2000);
-      const isVideo = await activityFrame
-        .$eval(
-          "#iFramePreview",
-          (element) => getComputedStyle(element).display === "none",
-        )
-        .catch(() => false);
-      console.log("isVideo", isVideo);
-      if (isVideo) {
-        await handleVideoActivity(activityFrame);
-      } else {
-        console.log("Activity time");
-        if (await activityFrame.$('input[type="file"]')) {
-          await handleFileInstructions(activityFrame);
-        } else {
-          await handleQuickCheckActivity(activityFrame);
-        }
-      }
-    },
-  };
+  const automation = new EducationalPlatformAutomation(userPage, userId);
+  await automation.initialize();
+}
 
-  async function performLogin({
-    username,
-    password,
-  }: {
-    username: string;
-    password: string;
-  }) {
-    if (!userPage) throw new Error("Couldn't find user page");
+/**
+ * Main automation class that handles the educational platform workflow
+ */
+class EducationalPlatformAutomation {
+  constructor(
+    private page: Page,
+    private userId: string,
+  ) {}
 
-    // if (
-    //   typeof process.env.username !== "string" ||
-    //   typeof process.env.password !== "string"
-    // ) {
-    //   console.error(
-    //     "Please add your login credentials to the environment variables file",
-    //   );
-    //   return;
-    // }
-    await userPage.goto(
-      "https://account.activedirectory.windowsazure.com/applications/signin/6be35607-d39b-4ec5-8b6f-bb7ec0fdc57a?tenantId=a2c165ce-3db2-4317-b742-8b26460ec108",
-      { timeout: 10000 },
-    );
-    await waitAndType(userPage, 'input[type="email"]', username);
-    await waitAndClick(userPage, 'input[type="submit"]');
-    await userPage.waitForSelector("#displayName");
-    await waitAndType(userPage, 'input[type="password"]', password);
-    await waitAndClick(userPage, 'input[type="submit"]');
-    await userPage.waitForNavigation();
-    console.log("Clicking submit again");
-    await userPage.waitForSelector('[role="heading"]');
-    await waitAndClick(userPage, 'input[type="submit"]');
-    await userPage.waitForNavigation();
-    try {
-      await userPage.waitForSelector(".duplicate-session-main-header", {
-        timeout: 3000,
-      });
-      console.log("Clicking submit");
-      await waitAndClick(userPage, 'input[value="Continue"]');
-    } catch {
-      console.log("No duplicate session, continuing...");
+  /**
+   * Initialize and start the automation process
+   */
+  async initialize(): Promise<void> {
+    const credentials = await this.loadUserCredentials();
+    if (!credentials) {
+      console.error("Invalid configuration - missing credentials");
+      return;
     }
-    await waitAndClick(userPage, 'a[title="Next Activity"]');
-    console.log("Signed in");
+
+    await this.authenticateUser(credentials);
+    await this.startActivityLoop();
   }
 
-  async function setup() {
+  /**
+   * Load user credentials from database
+   */
+  private async loadUserCredentials(): Promise<LoginCredentials | null> {
     const configurationData = await db.query.configuration.findFirst({
-      where: eq(configuration.userId, userId),
+      where: eq(configuration.userId, this.userId),
     });
-    if (!configurationData?.serviceCredentials) {
-      console.error("Invalid configuration");
-      return "invalid_config";
-    }
-    await performLogin({ ...configurationData.serviceCredentials });
-    await completeActivity();
+
+    return configurationData?.serviceCredentials ?? null;
   }
 
-  async function completeActivity() {
-    if (!userPage) throw new Error("Couldn't find user page");
+  /**
+   * Handle user authentication flow
+   */
+  private async authenticateUser(credentials: LoginCredentials): Promise<void> {
+    const { username, password } = credentials;
 
+    if (!this.page) {
+      throw new Error("Browser page not available");
+    }
+
+    console.log("Starting authentication process...");
+
+    // Navigate to login page
+    await this.page.goto(LOGIN_URL, { timeout: TIMEOUTS.DEFAULT });
+
+    // Enter email and proceed
+    await waitAndType(this.page, SELECTORS.EMAIL_INPUT, username);
+    await waitAndClick(this.page, SELECTORS.SUBMIT_BUTTON);
+
+    // Wait for password page and enter credentials
+    await this.page.waitForSelector(SELECTORS.DISPLAY_NAME);
+    await waitAndType(this.page, SELECTORS.PASSWORD_INPUT, password);
+    await waitAndClick(this.page, SELECTORS.SUBMIT_BUTTON);
+
+    // Handle multi-step authentication
+    await this.page.waitForNavigation();
+    console.log("Completing authentication flow...");
+
+    await this.page.waitForSelector(SELECTORS.HEADING);
+    await waitAndClick(this.page, SELECTORS.SUBMIT_BUTTON);
+    await this.page.waitForNavigation();
+
+    // Handle potential duplicate session
+    await this.handleDuplicateSession();
+
+    // Navigate to first activity
+    await waitAndClick(this.page, SELECTORS.NEXT_ACTIVITY);
+    console.log("Authentication completed successfully");
+  }
+
+  /**
+   * Handle duplicate session dialog if it appears
+   */
+  private async handleDuplicateSession(): Promise<void> {
     try {
-      await waitAndClick(userPage, ".footnav.goRight:not(.disabled)", {
-        timeout: 1000,
+      await this.page.waitForSelector(SELECTORS.DUPLICATE_SESSION, {
+        timeout: TIMEOUTS.DUPLICATE_SESSION,
+      });
+      console.log("Handling duplicate session...");
+      await waitAndClick(this.page, SELECTORS.CONTINUE_BUTTON);
+    } catch {
+      console.log("No duplicate session detected, continuing...");
+    }
+  }
+
+  /**
+   * Main activity completion loop
+   */
+  private async startActivityLoop(): Promise<void> {
+    await this.processCurrentActivity();
+  }
+
+  /**
+   * Process the current activity on the page
+   */
+  async processCurrentActivity(): Promise<void> {
+    if (!this.page) throw new Error("Browser page not available");
+
+    // Try to advance to next activity if possible
+    try {
+      await waitAndClick(this.page, SELECTORS.FOOTNAV_RIGHT, {
+        timeout: TIMEOUTS.NAVIGATION_DELAY,
       });
     } catch {
-      console.log("Activity not completed");
+      console.log("No navigation advancement available");
     }
-    await userPage.waitForSelector("#activity-title");
-    const activityType = await userPage.$eval(
-      "#activity-title",
-      (item) => item.textContent,
+
+    // Get activity information
+    await this.page.waitForSelector(SELECTORS.ACTIVITY_TITLE);
+    const activityType = await this.page.$eval(
+      SELECTORS.ACTIVITY_TITLE,
+      (element) => element.textContent?.trim() ?? "",
     );
-    const frameElement = await userPage.waitForSelector("#stageFrame");
+
+    console.log(`Processing activity type: ${activityType}`);
+
+    // Get activity frame
+    const frameElement = await this.page.waitForSelector(SELECTORS.STAGE_FRAME);
     const activityFrame = await frameElement?.contentFrame();
     if (!activityFrame) return;
 
+    // Try to advance frame if possible
     try {
-      await waitAndClick(activityFrame, ".FrameRight");
+      await waitAndClick(activityFrame, SELECTORS.FRAME_RIGHT);
     } catch {
-      console.log("Frame not completed");
+      console.log("Frame not ready for advancement");
     }
 
+    // Log activity progress if available
+    await this.logActivityProgress(activityFrame);
+
+    // Handle different activity types
+    if (activityType === "Quiz") {
+      console.log("Quiz detected - skipping automatic completion");
+      return;
+    }
+
+    await this.handleActivityContent(activityFrame);
+  }
+
+  /**
+   * Log the current activity progress
+   */
+  private async logActivityProgress(frame: Frame): Promise<void> {
     try {
-      await activityFrame.waitForSelector("#frameProgress", { timeout: 3000 });
-      const activityProgress = await activityFrame.$eval(
-        "#frameProgress",
-        (item) => item.textContent,
+      await frame.waitForSelector(SELECTORS.FRAME_PROGRESS, {
+        timeout: TIMEOUTS.FRAME_PROGRESS,
+      });
+      const progress = await frame.$eval(SELECTORS.FRAME_PROGRESS, (element) =>
+        element.textContent?.trim(),
       );
-      console.log(`Activity progress: ${activityProgress}`);
+      console.log(`Activity progress: ${progress}`);
     } catch {
-      console.error("Didn't find activity progress");
+      console.log("Activity progress not available");
+    }
+  }
+
+  /**
+   * Determine and handle the appropriate activity type
+   */
+  private async handleActivityContent(activityFrame: Frame): Promise<void> {
+    // Wait for content to load
+    await sleep(2000);
+
+    // Check if this is a video activity
+    const isVideo = await activityFrame
+      .$eval(
+        SELECTORS.IFRAME_PREVIEW,
+        (element) => getComputedStyle(element).display === "none",
+      )
+      .catch(() => false);
+
+    if (isVideo) {
+      await this.processVideoActivity(activityFrame);
+      return;
     }
 
-    if (activityType == "Quiz") {
-      console.log(`Item is a ${activityType}...`);
+    // Check if this is a file-based instruction activity
+    const hasFileUpload = !!(await activityFrame.$(SELECTORS.FILE_INPUT));
+    if (hasFileUpload) {
+      await this.processFileInstructionActivity(activityFrame);
+      return;
+    }
+    const hasInstructionLink = !!(await activityFrame.$(
+      SELECTORS.INSTRUCTION_LINK,
+    ));
+    if (hasInstructionLink) {
+      console.log("Instruction link detected - skipping automatic completion");
       return;
     } else {
-      await activityCompleter.instruction(activityFrame);
+      console.log("No instruction link or file upload detected");
     }
+
+    // Default to interactive question activity
+    await this.processInteractiveQuestionActivity(activityFrame);
   }
 
-  async function handleVideoActivity(activityFrame: Frame): Promise<void> {
-    console.log("Completing video");
-    await activityFrame.waitForSelector("li.pause");
-    console.log("Detected pause");
-    await activityFrame.waitForSelector("li.play", { timeout: 0 });
-    console.log("Video finished");
-    await sleep(500);
-    await activityFrame.click(".FrameRight");
-    await completeActivity();
+  /**
+   * Handle video-based activities
+   */
+  private async processVideoActivity(activityFrame: Frame): Promise<void> {
+    console.log("Processing video activity...");
+
+    // Wait for video to start (pause button appears)
+    await activityFrame.waitForSelector(SELECTORS.VIDEO_PAUSE);
+    console.log("Video playback detected");
+
+    // Wait for video to complete (play button reappears)
+    await activityFrame.waitForSelector(SELECTORS.VIDEO_PLAY, { timeout: 0 });
+    console.log("Video completed");
+
+    // Brief pause before proceeding
+    await sleep(TIMEOUTS.VIDEO_COMPLETION);
+
+    // Advance to next activity
+    await activityFrame.click(SELECTORS.FRAME_RIGHT);
+    await this.processCurrentActivity();
   }
 
-  async function handleFileInstructions(activityFrame: Frame): Promise<void> {
-    console.log("Downloading instructions");
+  /**
+   * Handle file-based instruction activities (PDFs, worksheets)
+   */
+  private async processFileInstructionActivity(
+    activityFrame: Frame,
+  ): Promise<void> {
+    console.log("Processing file instruction activity...");
+
+    // Download instruction files
     const instructionUrls = await activityFrame.$$eval(
-      "a:has(.icon-doc-pdf)",
+      SELECTORS.PDF_LINKS,
       (elements) => elements.map((el) => el.href),
     );
-    const base64List = await Promise.all(
-      instructionUrls.map(async (instructionUrl, i) => {
-        return downloadFile(instructionUrl, `./instructions-pt${i}.pdf`);
+
+    const instructionFiles = await Promise.all(
+      instructionUrls.map(async (url, index) => {
+        return downloadFile(url, `./instructions-pt${index}.pdf`);
       }),
     );
-    console.log("Files", base64List.length);
-    console.log("answering...");
+
+    console.log(`Downloaded ${instructionFiles.length} instruction files`);
+
+    // Generate AI response for the worksheet
+    const response = await this.generateWorksheetResponse(instructionFiles);
+
+    // Save the response
+    await fs.writeFile("./output.md", response);
+    console.log("Worksheet response generated and saved");
+  }
+
+  /**
+   * Generate AI response for worksheet/instruction activities
+   */
+  private async generateWorksheetResponse(
+    instructionFiles: (string | null)[],
+  ): Promise<string> {
+    const systemPrompt = this.createWorksheetSystemPrompt();
+
     const output = await generateText({
-      // model: perplexity("sonar-deep-research"),
-      // model: openai.responses("gpt-4.1-mini"),
       model: openai.responses("o4-mini"),
-      // tools: {
-      //   web_search_preview: openai.tools.webSearchPreview({
-      //     userLocation: {
-      //       type: "approximate",
-      //       country: "US",
-      //       region: process.env.user_state,
-      //       city: process.env.user_city,
-      //     },
-      //   }),
-      // },
       messages: [
         {
           role: "system",
-          content: `Answer in standard markdown. Include NO COMMENTARY, only your response itself. THIS IS NOT A CHAT, you are doing WORK! Your entire response will be printed, so DO NOT INCLUDE COMMENTARY AT THE BEGINNING OR THE END. Including something like 'This completes the worksheet' at the bottom invalidates your ENTIRE response. You are a student named ${process.env.user_name} (${process.env.user_role}) located in ${process.env.user_location}. No images will be inserted. Don't use code blocks unless it is actually code. Callouts are not supported. LaTeX is NOT supported. Write any math as plain text. Also, don't put your name on the worksheet.`,
+          content: systemPrompt,
         },
         {
           role: "user",
@@ -202,7 +367,7 @@ export async function startCrawling({
               type: "text",
               text: "Answer all parts of this worksheet. You may also be provided with additional resources, but the worksheet or assignment is your main priority. Anything else is purely supplemental.",
             },
-            ...base64List.map((data) => ({
+            ...instructionFiles.map((data) => ({
               type: "file" as const,
               data: data ?? "",
               mediaType: "application/pdf",
@@ -211,278 +376,475 @@ export async function startCrawling({
         },
       ],
     });
-    if (output.warnings) console.log("warnings", output.warnings);
-    console.log("answered", output.text);
-    await fs.writeFile("./output.md", output.text);
-    // await markdownToPdf(browser, {
-    //   src: output.text,
-    //   dest: "./output.pdf",
-    // });
+
+    if (output.warnings) {
+      console.log("AI generation warnings:", output.warnings);
+    }
+
+    return output.text;
   }
 
-  async function handleQuickCheckActivity(activityFrame: Frame): Promise<void> {
-    const previewElement = await activityFrame
-      .waitForSelector("#iFramePreview")
+  /**
+   * Create system prompt for worksheet completion
+   */
+  private createWorksheetSystemPrompt(): string {
+    return `Answer in standard markdown. Include NO COMMENTARY, only your response itself. THIS IS NOT A CHAT, you are doing WORK! Your entire response will be printed, so DO NOT INCLUDE COMMENTARY AT THE BEGINNING OR THE END. Including something like 'This completes the worksheet' at the bottom invalidates your ENTIRE response. You are a student named ${process.env.user_name} (${process.env.user_role}) located in ${process.env.user_location}. No images will be inserted. Don't use code blocks unless it is actually code. Callouts are not supported. LaTeX is NOT supported. Write any math as plain text. Also, don't put your name on the worksheet.`;
+  }
+
+  /**
+   * Handle interactive question activities (forms, quizzes)
+   */
+  private async processInteractiveQuestionActivity(
+    activityFrame: Frame,
+  ): Promise<void> {
+    const questionProcessor = new InteractiveQuestionProcessor(
+      activityFrame,
+      this,
+    );
+    await questionProcessor.processQuestions();
+  }
+}
+
+/**
+ * Handles processing of interactive questions and form inputs
+ */
+class InteractiveQuestionProcessor {
+  constructor(
+    private activityFrame: Frame,
+    private automation: EducationalPlatformAutomation,
+  ) {}
+
+  /**
+   * Main question processing workflow
+   */
+  async processQuestions(): Promise<void> {
+    // Get preview frame
+    const previewElement = await this.activityFrame
+      .waitForSelector(SELECTORS.IFRAME_PREVIEW)
       .catch(() => undefined);
+
     const previewFrame =
-      (await previewElement?.contentFrame()) ?? activityFrame;
-    await activityFrame
-      .$$eval("#invis-o-div", (elements) =>
+      (await previewElement?.contentFrame()) ?? this.activityFrame;
+
+    // Clean up invisible divs that might interfere
+    await this.cleanupInterfereElements(this.activityFrame);
+
+    console.log("Processing interactive questions...");
+
+    // Check for question content
+    const hasQuestions = await previewFrame.waitForSelector(
+      SELECTORS.CONTENT_CONTAINER,
+    );
+    if (!hasQuestions) {
+      console.log("No questions found in activity");
+      return;
+    }
+
+    // Extract question information
+    const questionData = await this.extractQuestionData(previewFrame);
+    if (!questionData) return;
+
+    const { questionText, inputSchema, questionElement } = questionData;
+
+    // Handle case with no inputs
+    if (inputSchema.length === 0) {
+      await this.handleNoInputActivity();
+      return;
+    }
+
+    // Generate and apply answers
+    await this.generateAndApplyAnswers(
+      questionText,
+      inputSchema,
+      questionElement,
+      previewElement ?? questionElement,
+    );
+
+    // Complete the activity
+    await this.completeQuestionActivity(previewFrame);
+  }
+
+  /**
+   * Remove interfering elements from the page
+   */
+  private async cleanupInterfereElements(frame: Frame): Promise<void> {
+    await frame
+      .$$eval(SELECTORS.INVIS_DIV, (elements) =>
         elements.forEach((item) => item.remove()),
       )
-      .catch(() => console.error("No invis-o-div"));
-    console.log("Removed invis-o-div");
-    if (true) {
-      console.log("Detected quick-check");
-      if (await previewFrame.waitForSelector(".content,.question-container")) {
-        const questionText = await previewFrame.$eval(
-          ".content,.question-container",
-          (item) => item.textContent,
-        );
-        await previewFrame.$$eval(".inline-field", (elements) =>
-          elements.forEach((element) => {
-            (element as HTMLDivElement).style.overflow = "visible";
-          }),
-        );
-        const questionElement = await previewFrame.$(
-          ".content,.question-container",
-        );
+      .catch(() => console.log("No interfering elements found"));
+  }
 
-        type InputType =
-          | { type: "input" }
-          | { type: "textarea" }
-          | { type: "checkbox"; label: string }
-          | { type: "radio"; label: string }
-          | { type: "select"; options: string[] };
+  /**
+   * Extract question text and input schema
+   */
+  private async extractQuestionData(previewFrame: Frame) {
+    const questionText = await previewFrame.$eval(
+      SELECTORS.CONTENT_CONTAINER,
+      (item) => item.textContent?.trim() ?? "",
+    );
 
-        const inputSchema = await questionElement?.$$eval(
-          "input,select,textarea",
-          (elements) => {
-            function createNumberDiv(number: number) {
-              const numberDiv = document.createElement("div");
-              numberDiv.textContent = number.toString();
-              numberDiv.style.position = "absolute";
-              numberDiv.style.display = "inline-block";
-              numberDiv.style.aspectRatio = "1";
-              numberDiv.style.height = "22px";
-              numberDiv.style.background = "hsl(210 70% 65%)";
-              numberDiv.style.textAlign = "center";
-              numberDiv.style.color = "white";
-              numberDiv.style.fontFamily = "monospace";
-              numberDiv.style.fontSize = "1.1rem";
-              return numberDiv;
-            }
-            return elements.map((element: Element, i: number) => {
-              if (
-                element.tagName === "SELECT" ||
-                element.tagName === "TEXTAREA" ||
-                (element.tagName === "INPUT" &&
-                  (element as HTMLInputElement).type !== "checkbox" &&
-                  (element as HTMLInputElement).type !== "radio")
-              ) {
-                const wrapper = document.createElement("span");
-                wrapper.style.position = "relative";
-                const parent = element.parentNode;
-                parent?.insertBefore(wrapper, element);
-                wrapper.appendChild(element);
-                element.after(createNumberDiv(i));
-              }
-              element.classList.add(`input-id-${i}`);
+    // Make inline fields visible
+    await previewFrame.$$eval(SELECTORS.INLINE_FIELD, (elements) =>
+      elements.forEach((element) => {
+        (element as HTMLDivElement).style.overflow = "visible";
+      }),
+    );
 
-              if (element.tagName === "SELECT") {
-                const options: string[] = [];
-                element.childNodes.forEach((childNode) => {
-                  if (childNode.textContent)
-                    options.push(childNode.textContent?.trim());
-                });
-                return { type: "select", options } as InputType;
-              }
-              if (
-                element.tagName === "INPUT" &&
-                (element as HTMLInputElement).type === "checkbox"
-              )
-                return {
-                  type: "checkbox",
-                  label:
-                    element.parentNode?.parentNode?.textContent?.trim() ?? "",
-                };
+    const questionElement = await previewFrame.$(SELECTORS.CONTENT_CONTAINER);
+    if (!questionElement) return null;
 
-              if (
-                element.tagName === "INPUT" &&
-                (element as HTMLInputElement).type === "radio"
-              )
-                return {
-                  type: "radio",
-                  label:
-                    element.parentNode?.parentNode?.textContent?.trim() ?? "",
-                };
-              if (element.tagName === "TEXTAREA")
-                return { type: "textarea" } as InputType;
-              return { type: "input" } as InputType;
-            });
-          },
-        );
+    // Analyze input elements and create schema
+    const inputSchema = await this.analyzeInputElements(questionElement);
 
-        const screenshot = await previewElement?.screenshot({
-          path: "./screenshot.png",
-        });
+    console.log("Question text:", questionText);
+    console.log("Input schema:", inputSchema);
 
-        console.log("Inputs:", inputSchema);
-        console.log("Question text:", questionText);
+    return { questionText, inputSchema, questionElement };
+  }
 
-        if (inputSchema?.length === 0) {
-          console.error("No inputs detected!");
-          try {
-            await activityFrame.waitForSelector("#btnEntryAudio", {
-              timeout: 15000,
-              visible: true,
-            });
-          } catch {
-            console.log("No audio");
-          }
-          //   await sleep(3000);
-          console.log("Clicking next");
-          await waitAndClick(
-            activityFrame,
-            ".FrameRight[style*='opacity:0.5']",
-          );
-          //   await activityFrame.click(".FrameRight");
-          await completeActivity();
-          return;
+  /**
+   * Analyze input elements on the page and create schema
+   */
+  private async analyzeInputElements(
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<InputType[]> {
+    return await questionElement.$$eval(
+      "input,select,textarea",
+      (elements: Element[]) => {
+        // Helper function to create numbered visual indicators
+        function createNumberDiv(number: number): HTMLDivElement {
+          const numberDiv = document.createElement("div");
+          numberDiv.textContent = number.toString();
+          numberDiv.style.position = "absolute";
+          numberDiv.style.display = "inline-block";
+          numberDiv.style.aspectRatio = "1";
+          numberDiv.style.height = "22px";
+          numberDiv.style.background = "hsl(210 70% 65%)";
+          numberDiv.style.textAlign = "center";
+          numberDiv.style.color = "white";
+          numberDiv.style.fontFamily = "monospace";
+          numberDiv.style.fontSize = "1.1rem";
+          return numberDiv;
         }
 
-        const zodSchema = z.object(
-          Object.fromEntries(
-            (inputSchema as InputType[]).map((val, i) => [
-              val.type === "checkbox" || val.type === "radio"
-                ? val.label.trim()
-                : i.toString(),
-              val.type == "input" || val.type == "textarea"
-                ? z.string()
-                : val.type === "select"
-                  ? z.enum(val.options as [string, ...string[]])
-                  : val.type === "checkbox" || val.type === "radio"
-                    ? z.boolean()
-                    : z.string(),
-            ]),
-          ),
-        );
+        return elements.map((element: Element, i: number) => {
+          // Add visual indicators for text inputs, selects, and textareas
+          if (
+            element.tagName === "SELECT" ||
+            element.tagName === "TEXTAREA" ||
+            (element.tagName === "INPUT" &&
+              (element as HTMLInputElement).type !== "checkbox" &&
+              (element as HTMLInputElement).type !== "radio")
+          ) {
+            const wrapper = document.createElement("span");
+            wrapper.style.position = "relative";
+            const parent = element.parentNode;
+            parent?.insertBefore(wrapper, element);
+            wrapper.appendChild(element);
+            element.after(createNumberDiv(i));
+          }
 
-        console.log(
-          Object.fromEntries(
-            (inputSchema as InputType[]).map((val, i) => [
-              val.type === "checkbox" || val.type === "radio"
-                ? val.label.trim()
-                : i.toString(),
-              val.type == "input" || val.type == "textarea"
-                ? "string"
-                : val.type === "select"
-                  ? z.enum(val.options as [string, ...string[]])
-                  : val.type === "checkbox" || val.type === "radio"
-                    ? "boolean"
-                    : "string",
-            ]),
-          ),
-        );
+          // Add identification class
+          element.classList.add(`input-id-${i}`);
 
-        const answer = await generateObject({
-          model: openai("o4-mini"),
-          providerOptions: {
-            openai: {
-              reasoningEffort: "low",
-            } satisfies OpenAIProviderOptions,
-          },
-          schema: zodSchema,
-          messages: [
+          // Determine input type and extract relevant data
+          if (element.tagName === "SELECT") {
+            const options: string[] = [];
+            element.childNodes.forEach((childNode) => {
+              if (childNode.textContent) {
+                options.push(childNode.textContent.trim());
+              }
+            });
+            return { type: "select", options } as InputType;
+          }
+
+          if (
+            element.tagName === "INPUT" &&
+            (element as HTMLInputElement).type === "checkbox"
+          ) {
+            return {
+              type: "checkbox",
+              label: element.parentNode?.parentNode?.textContent?.trim() ?? "",
+            } as InputType;
+          }
+
+          if (
+            element.tagName === "INPUT" &&
+            (element as HTMLInputElement).type === "radio"
+          ) {
+            return {
+              type: "radio",
+              label: element.parentNode?.parentNode?.textContent?.trim() ?? "",
+            } as InputType;
+          }
+
+          if (element.tagName === "TEXTAREA") {
+            return { type: "textarea" } as InputType;
+          }
+
+          return { type: "input" } as InputType;
+        });
+      },
+    );
+  }
+
+  /**
+   * Handle activities with no input elements
+   */
+  private async handleNoInputActivity(): Promise<void> {
+    console.log("No input elements detected - checking for audio content");
+
+    try {
+      await this.activityFrame.waitForSelector(SELECTORS.AUDIO_BUTTON, {
+        timeout: TIMEOUTS.AUDIO_BUTTON,
+        visible: true,
+      });
+      console.log("Audio content detected");
+    } catch {
+      console.log("No audio content found");
+    }
+
+    console.log("Advancing to next activity");
+
+    // Wait for the button to have opacity less than 100% (indicating it's pulsing/ready)
+    await this.activityFrame.waitForFunction(() => {
+      const frameRightButton = document.querySelector(".FrameRight");
+      if (!frameRightButton) return false;
+
+      const computedStyle = window.getComputedStyle(frameRightButton);
+      const opacity = parseFloat(computedStyle.opacity);
+      return opacity < 1.0;
+    });
+
+    // Click the button once it's in the pulsing state
+    await this.activityFrame.click(".FrameRight");
+    await this.automation.processCurrentActivity();
+  }
+
+  /**
+   * Generate AI answers and apply them to form inputs
+   */
+  private async generateAndApplyAnswers(
+    questionText: string,
+    inputSchema: InputType[],
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+    previewElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<void> {
+    // Create Zod schema for AI response validation
+    const zodSchema = this.createResponseSchema(inputSchema);
+
+    // Take screenshot for AI analysis
+    const screenshot = await previewElement?.screenshot({
+      path: "./screenshot.png",
+    });
+
+    // Generate AI response
+    const answer = await generateObject({
+      model: openai("o4-mini"),
+      providerOptions: {
+        openai: {
+          reasoningEffort: "low",
+        } satisfies OpenAIProviderOptions,
+      },
+      schema: zodSchema,
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Your job is to take the input and answer the question in the blanks. Each blank is labeled with a number, so when you're referencing a specific blank, you can refer to its number.\nOnly respond with the exact text that should go in that box. If a questions says option ___, only a letter or number should go in the blank, not "option a". That would make it "Option option a", which doesn't make any sense.\nAlso, if you are given a sample response, DO NOT JUST COPY IT! That would be plagarism, which is unethical. Instead, use it to create a somewhat similar response that covers the same points, while being unique. Basically, if I read your answer, I shouldn't be able to tell you could see the sample.\n\n# Question text: \n${questionText}`,
-                },
-                {
-                  type: "image",
-                  image: screenshot ?? "",
-                },
-              ],
+              type: "text",
+              text: this.createQuestionPrompt(questionText),
+            },
+            {
+              type: "image",
+              image: screenshot ?? "",
             },
           ],
-        });
+        },
+      ],
+    });
 
-        console.log(answer.object);
+    console.log("Generated answers:", answer.object);
 
-        for (const [index, value] of Object.entries(answer.object)) {
-          const schemaValue = inputSchema?.find(
-            // @ts-expect-error -- this is fine
-            (i, idx) => idx.toString() === index || i.label === index,
-          )!;
-          const schemaIndex = inputSchema?.indexOf(schemaValue);
+    // Apply answers to form elements
+    await this.applyAnswersToForm(answer.object, inputSchema, questionElement);
+  }
 
-          if (typeof value === "string" && schemaValue.type === "select") {
-            const selectElement = await questionElement?.$(
-              `select.input-id-${index}`,
-            );
-            const val = await selectElement
-              ?.$$eval(
-                "option",
-                (optionElements: HTMLOptionElement[], targetValue: string) =>
-                  optionElements.map((option: HTMLOptionElement) => {
-                    console.log(
-                      "content",
-                      option.textContent,
-                      targetValue,
-                      option.textContent?.trim() === targetValue.trim(),
-                    );
-                    return option.textContent?.trim() === targetValue.trim()
-                      ? option.value
-                      : undefined;
-                  }),
-                value,
-              )
-              .then((list: (string | undefined)[]) =>
-                list.find(
-                  (i: string | undefined) => i !== undefined && i !== null,
-                ),
-              );
-            console.log("Selecting:", val);
-            await selectElement?.select(val ?? "");
-          } else if (
-            schemaValue.type === "checkbox" ||
-            schemaValue.type === "radio"
-          ) {
-            const inputElement = await questionElement?.$(
-              `input.input-id-${schemaIndex}`,
-            );
-            console.log("clicking", value);
-            if (value === true) await inputElement?.click();
-          } else if (
-            schemaValue.type === "input" ||
-            schemaValue.type === "textarea"
-          ) {
-            const inputElement = await questionElement?.$(
-              `${schemaValue.type}.input-id-${schemaIndex}`,
-            );
-            await inputElement?.type(value as string);
-            if (schemaValue.type === "textarea") {
-              await activityFrame.click("#btnCheck");
-              await sleep(500);
-              //   await activityFrame.waitForSelector("input[type=checkbox]");
-            }
-          }
+  /**
+   * Create Zod schema for AI response validation
+   */
+  private createResponseSchema(
+    inputSchema: InputType[],
+  ): z.ZodObject<Record<string, z.ZodTypeAny>> {
+    const schemaFields = Object.fromEntries(
+      inputSchema.map((val, i) => {
+        const key =
+          val.type === "checkbox" || val.type === "radio"
+            ? val.label.trim()
+            : i.toString();
+
+        let zodType;
+        if (val.type === "input" || val.type === "textarea") {
+          zodType = z.string();
+        } else if (val.type === "select") {
+          zodType = z.enum(val.options as [string, ...string[]]);
+        } else if (val.type === "checkbox" || val.type === "radio") {
+          zodType = z.boolean();
+        } else {
+          zodType = z.string();
         }
+
+        return [key, zodType];
+      }),
+    );
+
+    return z.object(schemaFields);
+  }
+
+  /**
+   * Create prompt for AI question answering
+   */
+  private createQuestionPrompt(questionText: string): string {
+    return `Your job is to take the input and answer the question in the blanks. Each blank is labeled with a number, so when you're referencing a specific blank, you can refer to its number.
+Only respond with the exact text that should go in that box. If a questions says option ___, only a letter or number should go in the blank, not "option a". That would make it "Option option a", which doesn't make any sense.
+Also, if you are given a sample response, DO NOT JUST COPY IT! That would be plagarism, which is unethical. Instead, use it to create a somewhat similar response that covers the same points, while being unique. Basically, if I read your answer, I shouldn't be able to tell you could see the sample.
+
+# Question text: 
+${questionText}`;
+  }
+
+  /**
+   * Apply generated answers to form elements
+   */
+  private async applyAnswersToForm(
+    answers: Record<string, unknown>,
+    inputSchema: InputType[],
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<void> {
+    for (const [index, value] of Object.entries(answers)) {
+      const schemaValue = inputSchema.find(
+        (item, idx) =>
+          idx.toString() === index ||
+          ((item.type === "checkbox" || item.type === "radio") &&
+            item.label === index),
+      );
+
+      if (!schemaValue) continue;
+
+      const schemaIndex = inputSchema.indexOf(schemaValue);
+
+      if (typeof value === "string" && schemaValue.type === "select") {
+        await this.handleSelectInput(index, value, questionElement);
+      } else if (
+        schemaValue.type === "checkbox" ||
+        schemaValue.type === "radio"
+      ) {
+        await this.handleCheckboxRadioInput(
+          schemaIndex,
+          value as boolean,
+          questionElement,
+        );
+      } else if (
+        schemaValue.type === "input" ||
+        schemaValue.type === "textarea"
+      ) {
+        await this.handleTextInput(
+          schemaIndex,
+          schemaValue.type,
+          value as string,
+          questionElement,
+        );
       }
-      if (await previewFrame.$("#navBtnList")) {
-        await waitAndClick(previewFrame, "nextQuestion");
-        await completeActivity();
-        return;
-      }
-      await activityFrame.click("#btnCheck");
-      await activityFrame.waitForSelector("#btnExitAudio");
-      await activityFrame.click(".FrameRight");
-      await completeActivity();
     }
   }
 
-  await setup();
+  /**
+   * Handle select dropdown inputs
+   */
+  private async handleSelectInput(
+    index: string,
+    value: string,
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<void> {
+    const selectElement = await questionElement.$(`select.input-id-${index}`);
+
+    const optionValue = await selectElement
+      ?.$$eval(
+        "option",
+        (optionElements: HTMLOptionElement[], targetValue: string) =>
+          optionElements.map((option: HTMLOptionElement) => {
+            return option.textContent?.trim() === targetValue.trim()
+              ? option.value
+              : undefined;
+          }),
+        value,
+      )
+      .then((list: (string | undefined)[]) =>
+        list.find((item) => item !== undefined && item !== null),
+      );
+
+    console.log("Selecting option:", optionValue);
+    await selectElement?.select(optionValue ?? "");
+  }
+
+  /**
+   * Handle checkbox and radio button inputs
+   */
+  private async handleCheckboxRadioInput(
+    index: number,
+    value: boolean,
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<void> {
+    const inputElement = await questionElement.$(`input.input-id-${index}`);
+
+    console.log("Setting checkbox/radio:", value);
+    if (value === true) {
+      await inputElement?.click();
+    }
+  }
+
+  /**
+   * Handle text input and textarea elements
+   */
+  private async handleTextInput(
+    index: number,
+    inputType: string,
+    value: string,
+    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<void> {
+    const inputElement = await questionElement.$(
+      `${inputType}.input-id-${index}`,
+    );
+
+    await inputElement?.type(value);
+
+    if (inputType === "textarea") {
+      await this.activityFrame.click(SELECTORS.CHECK_BUTTON);
+      await sleep(TIMEOUTS.FORM_SUBMISSION);
+    }
+  }
+
+  /**
+   * Complete the question activity
+   */
+  private async completeQuestionActivity(previewFrame: Frame): Promise<void> {
+    // Check if there are more questions
+    if (await previewFrame.$(SELECTORS.NAV_BUTTON_LIST)) {
+      await waitAndClick(previewFrame, "nextQuestion");
+      await this.automation.processCurrentActivity();
+      return;
+    }
+
+    // Submit the current activity
+    await this.activityFrame.click(SELECTORS.CHECK_BUTTON);
+    await this.activityFrame.waitForSelector(SELECTORS.EXIT_AUDIO_BUTTON);
+    await this.activityFrame.click(SELECTORS.FRAME_RIGHT);
+    await this.automation.processCurrentActivity();
+  }
+}
+
+// Maintain backward compatibility with the original function name
+export async function startCrawling(config: AutomationConfig) {
+  return startEducationalAutomation(config);
 }
