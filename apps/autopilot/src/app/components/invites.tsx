@@ -20,6 +20,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@acme/ui/input-otp";
+import { toast } from "@acme/ui/toast";
 
 import { cn } from "~/lib/utils";
 import { checkCode, getCode } from "./actions";
@@ -85,6 +86,10 @@ export function InviteButton() {
     queryFn: getCode,
   });
   if (!generateQuery.data) return null;
+  const formattedCode =
+    generateQuery.data === "Unauthorized"
+      ? "Loading..."
+      : `${generateQuery.data.code.substring(0, 3)}-${generateQuery.data.code.substring(3)}`;
 
   return (
     <Dialog>
@@ -104,15 +109,27 @@ export function InviteButton() {
             <br />
             {generateQuery.data !== "Unauthorized" &&
               !generateQuery.isLoading &&
-              `${generateQuery.data.remaining} invites remaining`}
+              `${generateQuery.data.remaining + 1} invites remaining`}
           </DialogDescription>
         </DialogHeader>
-        <div className="w-full py-6 text-center text-4xl font-semibold">
-          {generateQuery.data !== "Unauthorized" && !generateQuery.isLoading ? (
-            `${generateQuery.data.code.substring(0, 3)}-${generateQuery.data.code.substring(3)}`
-          ) : (
-            <div>Loading...</div>
-          )}
+        <div
+          onClick={async () => {
+            await navigator.clipboard.writeText(formattedCode);
+            toast.success("Copied to clipboard");
+          }}
+          className="w-full cursor-pointer py-6 text-center font-mono text-4xl font-semibold"
+        >
+          <div>
+            {generateQuery.data !== "Unauthorized" &&
+            !generateQuery.isLoading ? (
+              formattedCode
+            ) : (
+              <div>Loading...</div>
+            )}
+          </div>
+          <div className="text-muted-foreground font-sans text-sm font-normal">
+            Click to copy
+          </div>
         </div>
         {/* <Button */}
         {/*   onClick={async () => { */}
