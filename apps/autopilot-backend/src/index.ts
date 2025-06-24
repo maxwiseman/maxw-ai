@@ -28,7 +28,7 @@ const args = [
 
 const options: LaunchOptions = {
   args: args,
-  headless: false,
+  headless: process.env.NODE_ENV === "development" ? false : true,
   // userDataDir: "/Users/maxwiseman/Library/Application Support/Google/Chrome",
   // userDataDir: "./tmp",
   protocolTimeout: 1200000,
