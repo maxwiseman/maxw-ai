@@ -6,6 +6,7 @@ import type { Frame, Page } from "puppeteer";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText } from "ai";
 import { sleep } from "bun";
+import { Mouse } from "puppeteer";
 import { z } from "zod";
 
 import { eq } from "@acme/db";
@@ -54,7 +55,10 @@ const SELECTORS = {
   EXIT_AUDIO_BUTTON: "#btnExitAudio",
   NAV_BUTTON_LIST: "#navBtnList",
   FILE_INPUT: 'input[type="file"]',
-  INSTRUCTION_LINK: '#iFramePreview .content a[target="_blank"]',
+  INSTRUCTION_LINK: '.content a[target="_blank"]',
+  DRAG_DROP_COLUMNS: ".sbgColumn",
+  DRAG_DROP_COLUMN_LABELS: ".catLabel",
+  DRAG_DROP_TILES: ".sbgTile",
 } as const;
 
 // Types
@@ -279,15 +283,6 @@ class EducationalPlatformAutomation {
       await this.processFileInstructionActivity(activityFrame);
       return;
     }
-    const hasInstructionLink = !!(await activityFrame.$(
-      SELECTORS.INSTRUCTION_LINK,
-    ));
-    if (hasInstructionLink) {
-      console.log("Instruction link detected - skipping automatic completion");
-      return;
-    } else {
-      console.log("No instruction link or file upload detected");
-    }
 
     // Default to interactive question activity
     await this.processInteractiveQuestionActivity(activityFrame);
@@ -399,6 +394,7 @@ class EducationalPlatformAutomation {
   ): Promise<void> {
     const questionProcessor = new InteractiveQuestionProcessor(
       activityFrame,
+      this.page,
       this,
     );
     await questionProcessor.processQuestions();
@@ -411,6 +407,7 @@ class EducationalPlatformAutomation {
 class InteractiveQuestionProcessor {
   constructor(
     private activityFrame: Frame,
+    private page: Page,
     private automation: EducationalPlatformAutomation,
   ) {}
 
@@ -428,6 +425,40 @@ class InteractiveQuestionProcessor {
 
     // Clean up invisible divs that might interfere
     await this.cleanupInterfereElements(this.activityFrame);
+
+    // Check if this is a file-based instruction activity
+    const hasInstructionLink = !!(await previewFrame.$(
+      SELECTORS.INSTRUCTION_LINK,
+    ));
+    if (hasInstructionLink) {
+      console.log("Instruction link detected - skipping automatic completion");
+      return;
+    }
+
+    // Check if this is a file-based instruction activity
+    const hasDragDropColumns = !!(await previewFrame.$(
+      SELECTORS.DRAG_DROP_COLUMNS,
+    ));
+    if (hasDragDropColumns) {
+      console.log("Drag drop columns detected - processing...");
+      await this.processDragDropColumns();
+      return;
+    }
+
+    await this.processDefaultQuestion();
+  }
+
+  /**
+   * Default question processing workflow
+   */
+  async processDefaultQuestion(): Promise<void> {
+    // Get preview frame
+    const previewElement = await this.activityFrame
+      .waitForSelector(SELECTORS.IFRAME_PREVIEW)
+      .catch(() => undefined);
+
+    const previewFrame =
+      (await previewElement?.contentFrame()) ?? this.activityFrame;
 
     console.log("Processing interactive questions...");
 
@@ -462,6 +493,246 @@ class InteractiveQuestionProcessor {
 
     // Complete the activity
     await this.completeQuestionActivity(previewFrame);
+  }
+
+  /**
+   * Process drag drop columns
+   */
+  private async processDragDropColumns(): Promise<void> {
+    // Get preview frame
+    const previewElement = await this.activityFrame
+      .waitForSelector(SELECTORS.IFRAME_PREVIEW)
+      .catch(() => undefined);
+
+    const previewFrame =
+      (await previewElement?.contentFrame()) ?? this.activityFrame;
+
+    const questionText = await previewFrame.$eval(
+      SELECTORS.CONTENT_CONTAINER,
+      (item) => item.textContent?.trim() ?? "",
+    );
+
+    // Get drag drop column elements and their text content
+    // We need to map the label text to the corresponding drop container
+    const columnLabelElements = await previewFrame.$$(
+      SELECTORS.DRAG_DROP_COLUMN_LABELS,
+    );
+    const columnTextToElement = new Map<
+      string,
+      NonNullable<Awaited<ReturnType<Frame["$"]>>>
+    >();
+    const columnTexts: string[] = [];
+
+    for (const labelElement of columnLabelElements) {
+      const text = await labelElement.evaluate(
+        (el) => el.textContent?.trim() ?? "",
+      );
+      if (text) {
+        // Find the parent .catColumn and then get the .dropContainer within it
+        const dropContainer = await labelElement.evaluateHandle((label) => {
+          const catColumn = label.closest(".catColumn");
+          return catColumn?.querySelector(".dropContainer");
+        });
+
+        const dropElement = dropContainer.asElement() as NonNullable<
+          Awaited<ReturnType<Frame["$"]>>
+        > | null;
+        if (dropElement) {
+          columnTextToElement.set(text, dropElement);
+          columnTexts.push(text);
+        }
+      }
+    }
+
+    // Get drag drop tile elements and their text content
+    const tileElements = await previewFrame.$$(SELECTORS.DRAG_DROP_TILES);
+    const tileTextToElement = new Map<
+      string,
+      NonNullable<Awaited<ReturnType<Frame["$"]>>>
+    >();
+    const tileTexts: string[] = [];
+
+    for (const element of tileElements) {
+      const text = await element.evaluate((el) => el.textContent?.trim() ?? "");
+      if (text) {
+        tileTextToElement.set(text, element);
+        tileTexts.push(text);
+      }
+    }
+
+    console.log(`Detected columns: ${columnTexts.join(", ")}`);
+    console.log(`Detected tiles: ${tileTexts.join(", ")}`);
+
+    const columnEnum = z.enum(columnTexts as [string, ...string[]]);
+    const dragDropSchema = z.object(
+      Object.fromEntries(tileTexts.map((tile) => [tile, columnEnum])),
+    );
+
+    // Take screenshot for AI analysis
+    const screenshot = await previewElement?.screenshot({
+      path: "./screenshot.png",
+    });
+
+    const responses = await generateObject({
+      model: openai("o4-mini"),
+      schema: dragDropSchema,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Sort the tiles into the correct columns. The question is: ${questionText}`,
+            },
+            { type: "image", image: screenshot ?? "" },
+          ],
+        },
+      ],
+    });
+
+    console.log("Responses:", responses.object);
+
+    // Perform the actual drag and drop operations
+    if (previewElement) {
+      console.log("Starting drag and drop operations...");
+
+      for (const [tileText, targetColumnText] of Object.entries(
+        responses.object,
+      )) {
+        console.log(
+          `Moving tile "${tileText}" to column "${targetColumnText}"`,
+        );
+
+        // Get the tile element from our mapping
+        const tileElement = tileTextToElement.get(tileText);
+        if (!tileElement) {
+          console.error(`Could not find tile element: ${tileText}`);
+          continue;
+        }
+
+        const tileBox = await tileElement.boundingBox();
+        if (!tileBox) {
+          console.error(`Could not get bounding box for tile: ${tileText}`);
+          continue;
+        }
+
+        // Get the column element from our mapping
+        const columnElement = columnTextToElement.get(targetColumnText);
+        if (!columnElement) {
+          console.error(`Could not find column element: ${targetColumnText}`);
+          continue;
+        }
+
+        const columnBox = await columnElement.boundingBox();
+        if (!columnBox) {
+          console.error(
+            `Could not get bounding box for column: ${targetColumnText}`,
+          );
+          continue;
+        }
+
+        // Calculate absolute coordinates using the alternative method
+        const tileCoords = await this.calculateDragDropCoordinates(tileElement);
+        const columnCoords =
+          await this.calculateDragDropCoordinates(columnElement);
+
+        if (!tileCoords) {
+          console.error(
+            `Could not calculate coordinates for tile: ${tileText}`,
+          );
+          continue;
+        }
+
+        if (!columnCoords) {
+          console.error(
+            `Could not calculate coordinates for column: ${targetColumnText}`,
+          );
+          continue;
+        }
+
+        // Perform the drag and drop operation using manual mouse events
+        try {
+          console.log(
+            `Dragging from (${tileCoords.x}, ${tileCoords.y}) to (${columnCoords.x}, ${columnCoords.y})`,
+          );
+
+          // Move to the tile and press mouse down
+          await this.page.mouse.move(tileCoords.x, tileCoords.y);
+          await sleep(100);
+          await this.page.mouse.down();
+          await sleep(200);
+
+          // Drag to the column
+          await this.page.mouse.move(columnCoords.x, columnCoords.y, {
+            steps: 10,
+          });
+          await sleep(300);
+
+          // Release the mouse
+          await this.page.mouse.up();
+          await sleep(200);
+
+          console.log(
+            `Successfully dropped tile "${tileText}" into column "${targetColumnText}"`,
+          );
+
+          // Brief pause between operations
+          await sleep(500);
+        } catch (error) {
+          console.error(`Failed to drag tile "${tileText}":`, error);
+        }
+      }
+
+      console.log("Drag and drop operations completed");
+
+      // Complete the activity
+      await this.completeQuestionActivity(previewFrame);
+    } else {
+      console.error("Preview element not found, cannot perform drag and drop");
+    }
+  }
+
+  /**
+   * Alternative method to calculate absolute coordinates by evaluating element position in main page context
+   */
+  private async calculateDragDropCoordinates(
+    element: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
+  ): Promise<{ x: number; y: number } | null> {
+    try {
+      // Use a different approach - get the element's position relative to the viewport
+      // and account for any scrolling or transformations
+      const rect = await element.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left,
+        };
+      });
+
+      // Get the positions of the iframe elements to calculate the nested offset
+      const activityFrameElement = await this.page.$(SELECTORS.STAGE_FRAME);
+      if (!activityFrameElement) return null;
+
+      const activityFrameRect = await activityFrameElement.evaluate(
+        (iframe) => {
+          const rect = iframe.getBoundingClientRect();
+          return { x: rect.x, y: rect.y };
+        },
+      );
+
+      // The element's rect is relative to its frame, we need to add the frame's position
+      return {
+        x: activityFrameRect.x + rect.x + rect.width / 2,
+        y: activityFrameRect.y + rect.y + rect.height / 2,
+      };
+    } catch (error) {
+      console.error("Failed to calculate alternative coordinates:", error);
+      return null;
+    }
   }
 
   /**
