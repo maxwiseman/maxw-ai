@@ -257,6 +257,8 @@ serve<WSData, {}>({
   },
 });
 
+console.log("Server started");
+
 export interface WSData {
   auth: Session;
 }
