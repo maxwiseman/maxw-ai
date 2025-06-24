@@ -11,7 +11,7 @@ type StatusType = StatusUpdate["type"];
 
 let idCounter = 0;
 function generateStatusId(): string {
-  return `status_${++idCounter}_${performance.now()}`;
+  return `status_${++idCounter}_${Date.now()}`;
 }
 
 export class Status {
@@ -52,7 +52,7 @@ export class Status {
       message,
       type: options?.type ?? this._status.type,
       description: options?.description ?? this._status.description,
-      timestamp: performance.now(),
+      timestamp: Date.now(),
     };
 
     // Update in user statuses and send update
