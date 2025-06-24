@@ -14,7 +14,13 @@ import { db } from "@acme/db/client";
 import { configuration } from "@acme/db/schema";
 
 import type { WSServerMessageSchema } from "./message-schema";
-import { downloadFile, waitAndClick, waitAndType } from "./utils";
+import { createStatus } from "./status-update";
+import {
+  downloadFile,
+  normalizeWhitespace,
+  waitAndClick,
+  waitAndType,
+} from "./utils";
 
 // Constants
 const LOGIN_URL =
@@ -92,7 +98,11 @@ export async function startEducationalAutomation(config: AutomationConfig) {
   // Notify that automation is starting
   sendMessage({ type: "newState", state: { status: "running" } });
 
-  const automation = new EducationalPlatformAutomation(userPage, userId);
+  const automation = new EducationalPlatformAutomation(
+    userPage,
+    userId,
+    sendMessage,
+  );
   await automation.initialize();
 }
 
@@ -103,6 +113,7 @@ class EducationalPlatformAutomation {
   constructor(
     private page: Page,
     private userId: string,
+    private sendMessage: (data: z.infer<typeof WSServerMessageSchema>) => void,
   ) {}
 
   /**
@@ -112,6 +123,12 @@ class EducationalPlatformAutomation {
     const credentials = await this.loadUserCredentials();
     if (!credentials) {
       console.error("Invalid configuration - missing credentials");
+      const errorStatus = createStatus(
+        this.userId,
+        "Configuration Error",
+        { type: "error", description: "Missing authentication credentials" },
+        this.sendMessage,
+      );
       return;
     }
 
@@ -140,6 +157,16 @@ class EducationalPlatformAutomation {
       throw new Error("Browser page not available");
     }
 
+    const authStatus = createStatus(
+      this.userId,
+      "Starting authentication process",
+      {
+        type: "pending",
+        description: "Connecting to the educational platform",
+      },
+      this.sendMessage,
+    );
+
     console.log("Starting authentication process...");
 
     // Navigate to login page
@@ -149,6 +176,11 @@ class EducationalPlatformAutomation {
     await waitAndType(this.page, SELECTORS.EMAIL_INPUT, username);
     await waitAndClick(this.page, SELECTORS.SUBMIT_BUTTON);
 
+    authStatus.update("Entering credentials", {
+      type: "pending",
+      description: "Submitting login information",
+    });
+
     // Wait for password page and enter credentials
     await this.page.waitForSelector(SELECTORS.DISPLAY_NAME);
     await waitAndType(this.page, SELECTORS.PASSWORD_INPUT, password);
@@ -157,6 +189,11 @@ class EducationalPlatformAutomation {
     // Handle multi-step authentication
     await this.page.waitForNavigation();
     console.log("Completing authentication flow...");
+
+    authStatus.update("Completing authentication flow", {
+      type: "pending",
+      description: "Processing multi-step authentication",
+    });
 
     await this.page.waitForSelector(SELECTORS.HEADING);
     await waitAndClick(this.page, SELECTORS.SUBMIT_BUTTON);
@@ -168,6 +205,11 @@ class EducationalPlatformAutomation {
     // Navigate to first activity
     await waitAndClick(this.page, SELECTORS.NEXT_ACTIVITY);
     console.log("Authentication completed successfully");
+
+    authStatus.update("Authentication completed successfully", {
+      type: "success",
+      description: "Ready to begin activities",
+    });
   }
 
   /**
@@ -211,10 +253,34 @@ class EducationalPlatformAutomation {
     await this.page.waitForSelector(SELECTORS.ACTIVITY_TITLE);
     const activityType = await this.page.$eval(
       SELECTORS.ACTIVITY_TITLE,
-      (element) => element.textContent?.trim() ?? "",
+      (element) => {
+        const text = element.textContent?.trim() ?? "";
+        // Inline normalization: replace problematic whitespace with regular spaces
+        return text.replace(
+          /[\t\f\v \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u200B\u200C\u200D\uFEFF]+/g,
+          " ",
+        );
+      },
     );
 
     console.log(`Processing activity type: ${activityType}`);
+
+    const activityStatus = createStatus(
+      this.userId,
+      `Processing ${activityType} activity`,
+      { type: "pending", description: "Analyzing activity content" },
+      this.sendMessage,
+    );
+
+    // Handle different activity types
+    if (activityType === "Quiz") {
+      console.log("Quiz detected - skipping automatic completion");
+      activityStatus.update("Quiz detected", {
+        type: "pending",
+        description: "Skipping automatic completion for quiz activity",
+      });
+      return;
+    }
 
     // Get activity frame
     const frameElement = await this.page.waitForSelector(SELECTORS.STAGE_FRAME);
@@ -230,14 +296,7 @@ class EducationalPlatformAutomation {
 
     // Log activity progress if available
     await this.logActivityProgress(activityFrame);
-
-    // Handle different activity types
-    if (activityType === "Quiz") {
-      console.log("Quiz detected - skipping automatic completion");
-      return;
-    }
-
-    await this.handleActivityContent(activityFrame);
+    await this.handleActivityContent(activityFrame, activityStatus);
   }
 
   /**
@@ -248,8 +307,16 @@ class EducationalPlatformAutomation {
       await frame.waitForSelector(SELECTORS.FRAME_PROGRESS, {
         timeout: TIMEOUTS.FRAME_PROGRESS,
       });
-      const progress = await frame.$eval(SELECTORS.FRAME_PROGRESS, (element) =>
-        element.textContent?.trim(),
+      const progress = await frame.$eval(
+        SELECTORS.FRAME_PROGRESS,
+        (element) => {
+          const text = element.textContent?.trim() ?? "";
+          // Inline normalization: replace problematic whitespace with regular spaces
+          return text.replace(
+            /[\t\f\v \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u200B\u200C\u200D\uFEFF]+/g,
+            " ",
+          );
+        },
       );
       console.log(`Activity progress: ${progress}`);
     } catch {
@@ -260,7 +327,10 @@ class EducationalPlatformAutomation {
   /**
    * Determine and handle the appropriate activity type
    */
-  private async handleActivityContent(activityFrame: Frame): Promise<void> {
+  private async handleActivityContent(
+    activityFrame: Frame,
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     // Wait for content to load
     await sleep(2000);
 
@@ -273,34 +343,62 @@ class EducationalPlatformAutomation {
       .catch(() => false);
 
     if (isVideo) {
-      await this.processVideoActivity(activityFrame);
+      activityStatus.update("Processing video activity", {
+        type: "pending",
+        description: "Waiting for video to complete",
+      });
+      await this.processVideoActivity(activityFrame, activityStatus);
       return;
     }
 
     // Check if this is a file-based instruction activity
     const hasFileUpload = !!(await activityFrame.$(SELECTORS.FILE_INPUT));
     if (hasFileUpload) {
-      await this.processFileInstructionActivity(activityFrame);
+      activityStatus.update("Processing file instruction activity", {
+        type: "pending",
+        description: "Downloading and processing instruction files",
+      });
+      await this.processFileInstructionActivity(activityFrame, activityStatus);
       return;
     }
 
     // Default to interactive question activity
-    await this.processInteractiveQuestionActivity(activityFrame);
+    activityStatus.update("Processing interactive questions", {
+      type: "pending",
+      description: "Analyzing and answering questions",
+    });
+    await this.processInteractiveQuestionActivity(
+      activityFrame,
+      activityStatus,
+    );
   }
 
   /**
    * Handle video-based activities
    */
-  private async processVideoActivity(activityFrame: Frame): Promise<void> {
+  private async processVideoActivity(
+    activityFrame: Frame,
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     console.log("Processing video activity...");
 
     // Wait for video to start (pause button appears)
     await activityFrame.waitForSelector(SELECTORS.VIDEO_PAUSE);
     console.log("Video playback detected");
 
+    activityStatus.update("Video playback detected", {
+      type: "pending",
+      description: "Waiting for video to complete",
+    });
+
     // Wait for video to complete (play button reappears)
     await activityFrame.waitForSelector(SELECTORS.VIDEO_PLAY, { timeout: 0 });
     console.log("Video completed");
+
+    activityStatus.update("Video completed", {
+      type: "success",
+      description: "Moving to next activity",
+    });
 
     // Brief pause before proceeding
     await sleep(TIMEOUTS.VIDEO_COMPLETION);
@@ -315,6 +413,7 @@ class EducationalPlatformAutomation {
    */
   private async processFileInstructionActivity(
     activityFrame: Frame,
+    activityStatus: ReturnType<typeof createStatus>,
   ): Promise<void> {
     console.log("Processing file instruction activity...");
 
@@ -324,6 +423,11 @@ class EducationalPlatformAutomation {
       (elements) => elements.map((el) => el.href),
     );
 
+    activityStatus.update("Downloading instruction files", {
+      type: "pending",
+      description: `Downloading ${instructionUrls.length} files`,
+    });
+
     const instructionFiles = await Promise.all(
       instructionUrls.map(async (url, index) => {
         return downloadFile(url, `./instructions-pt${index}.pdf`);
@@ -332,12 +436,22 @@ class EducationalPlatformAutomation {
 
     console.log(`Downloaded ${instructionFiles.length} instruction files`);
 
+    activityStatus.update("Generating worksheet response", {
+      type: "pending",
+      description: "Using AI to complete the worksheet",
+    });
+
     // Generate AI response for the worksheet
     const response = await this.generateWorksheetResponse(instructionFiles);
 
     // Save the response
     await fs.writeFile("./output.md", response);
     console.log("Worksheet response generated and saved");
+
+    activityStatus.update("Worksheet completed", {
+      type: "success",
+      description: "AI response generated and saved",
+    });
   }
 
   /**
@@ -391,13 +505,15 @@ class EducationalPlatformAutomation {
    */
   private async processInteractiveQuestionActivity(
     activityFrame: Frame,
+    activityStatus: ReturnType<typeof createStatus>,
   ): Promise<void> {
     const questionProcessor = new InteractiveQuestionProcessor(
       activityFrame,
       this.page,
       this,
+      this.sendMessage,
     );
-    await questionProcessor.processQuestions();
+    await questionProcessor.processQuestions(activityStatus);
   }
 }
 
@@ -409,12 +525,15 @@ class InteractiveQuestionProcessor {
     private activityFrame: Frame,
     private page: Page,
     private automation: EducationalPlatformAutomation,
+    private sendMessage: (data: z.infer<typeof WSServerMessageSchema>) => void,
   ) {}
 
   /**
    * Main question processing workflow
    */
-  async processQuestions(): Promise<void> {
+  async processQuestions(
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     // Get preview frame
     const previewElement = await this.activityFrame
       .waitForSelector(SELECTORS.IFRAME_PREVIEW)
@@ -432,26 +551,37 @@ class InteractiveQuestionProcessor {
     ));
     if (hasInstructionLink) {
       console.log("Instruction link detected - skipping automatic completion");
+      activityStatus.update("Instruction link detected", {
+        type: "pending",
+        description:
+          "Skipping automatic completion for manual instruction activity",
+      });
       return;
     }
 
-    // Check if this is a file-based instruction activity
+    // Check if this is a drag and drop activity
     const hasDragDropColumns = !!(await previewFrame.$(
       SELECTORS.DRAG_DROP_COLUMNS,
     ));
     if (hasDragDropColumns) {
       console.log("Drag drop columns detected - processing...");
-      await this.processDragDropColumns();
+      activityStatus.update("Processing drag and drop activity", {
+        type: "pending",
+        description: "Analyzing drag and drop elements",
+      });
+      await this.processDragDropColumns(activityStatus);
       return;
     }
 
-    await this.processDefaultQuestion();
+    await this.processDefaultQuestion(activityStatus);
   }
 
   /**
    * Default question processing workflow
    */
-  async processDefaultQuestion(): Promise<void> {
+  async processDefaultQuestion(
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     // Get preview frame
     const previewElement = await this.activityFrame
       .waitForSelector(SELECTORS.IFRAME_PREVIEW)
@@ -468,6 +598,10 @@ class InteractiveQuestionProcessor {
     );
     if (!hasQuestions) {
       console.log("No questions found in activity");
+      activityStatus.update("No questions found", {
+        type: "pending",
+        description: "Activity has no interactive elements",
+      });
       return;
     }
 
@@ -479,9 +613,14 @@ class InteractiveQuestionProcessor {
 
     // Handle case with no inputs
     if (inputSchema.length === 0) {
-      await this.handleNoInputActivity();
+      await this.handleNoInputActivity(activityStatus);
       return;
     }
+
+    activityStatus.update("Generating AI responses", {
+      type: "pending",
+      description: "Using AI to answer the questions",
+    });
 
     // Generate and apply answers
     await this.generateAndApplyAnswers(
@@ -492,13 +631,15 @@ class InteractiveQuestionProcessor {
     );
 
     // Complete the activity
-    await this.completeQuestionActivity(previewFrame);
+    await this.completeQuestionActivity(previewFrame, activityStatus);
   }
 
   /**
    * Process drag drop columns
    */
-  private async processDragDropColumns(): Promise<void> {
+  private async processDragDropColumns(
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     // Get preview frame
     const previewElement = await this.activityFrame
       .waitForSelector(SELECTORS.IFRAME_PREVIEW)
@@ -509,7 +650,7 @@ class InteractiveQuestionProcessor {
 
     const questionText = await previewFrame.$eval(
       SELECTORS.CONTENT_CONTAINER,
-      (item) => item.textContent?.trim() ?? "",
+      (item) => normalizeWhitespace(item.textContent?.trim() ?? ""),
     );
 
     // Get drag drop column elements and their text content
@@ -524,8 +665,8 @@ class InteractiveQuestionProcessor {
     const columnTexts: string[] = [];
 
     for (const labelElement of columnLabelElements) {
-      const text = await labelElement.evaluate(
-        (el) => el.textContent?.trim() ?? "",
+      const text = await labelElement.evaluate((el) =>
+        normalizeWhitespace(el.textContent?.trim() ?? ""),
       );
       if (text) {
         // Find the parent .catColumn and then get the .dropContainer within it
@@ -553,7 +694,9 @@ class InteractiveQuestionProcessor {
     const tileTexts: string[] = [];
 
     for (const element of tileElements) {
-      const text = await element.evaluate((el) => el.textContent?.trim() ?? "");
+      const text = await element.evaluate((el) =>
+        normalizeWhitespace(el.textContent?.trim() ?? ""),
+      );
       if (text) {
         tileTextToElement.set(text, element);
         tileTexts.push(text);
@@ -567,6 +710,11 @@ class InteractiveQuestionProcessor {
     const dragDropSchema = z.object(
       Object.fromEntries(tileTexts.map((tile) => [tile, columnEnum])),
     );
+
+    activityStatus.update("Analyzing drag and drop with AI", {
+      type: "pending",
+      description: `Sorting ${tileTexts.length} tiles into ${columnTexts.length} columns`,
+    });
 
     // Take screenshot for AI analysis
     const screenshot = await previewElement?.screenshot({
@@ -591,6 +739,11 @@ class InteractiveQuestionProcessor {
     });
 
     console.log("Responses:", responses.object);
+
+    activityStatus.update("Performing drag and drop operations", {
+      type: "pending",
+      description: "Moving tiles to their designated columns",
+    });
 
     // Perform the actual drag and drop operations
     if (previewElement) {
@@ -685,10 +838,19 @@ class InteractiveQuestionProcessor {
 
       console.log("Drag and drop operations completed");
 
+      activityStatus.update("Drag and drop completed", {
+        type: "success",
+        description: "All tiles have been moved to their designated columns",
+      });
+
       // Complete the activity
-      await this.completeQuestionActivity(previewFrame);
+      await this.completeQuestionActivity(previewFrame, activityStatus);
     } else {
       console.error("Preview element not found, cannot perform drag and drop");
+      activityStatus.update("Drag and drop failed", {
+        type: "error",
+        description: "Could not find preview element for drag and drop",
+      });
     }
   }
 
@@ -752,7 +914,7 @@ class InteractiveQuestionProcessor {
   private async extractQuestionData(previewFrame: Frame) {
     const questionText = await previewFrame.$eval(
       SELECTORS.CONTENT_CONTAINER,
-      (item) => item.textContent?.trim() ?? "",
+      (item) => normalizeWhitespace(item.textContent?.trim() ?? ""),
     );
 
     // Make inline fields visible
@@ -799,6 +961,14 @@ class InteractiveQuestionProcessor {
           return numberDiv;
         }
 
+        // Inline normalization function
+        function normalizeWhitespace(text: string): string {
+          return text.replace(
+            /[\t\f\v \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u200B\u200C\u200D\uFEFF]+/g,
+            " ",
+          );
+        }
+
         return elements.map((element: Element, i: number) => {
           // Add visual indicators for text inputs, selects, and textareas
           if (
@@ -824,7 +994,7 @@ class InteractiveQuestionProcessor {
             const options: string[] = [];
             element.childNodes.forEach((childNode) => {
               if (childNode.textContent) {
-                options.push(childNode.textContent.trim());
+                options.push(normalizeWhitespace(childNode.textContent.trim()));
               }
             });
             return { type: "select", options } as InputType;
@@ -836,7 +1006,9 @@ class InteractiveQuestionProcessor {
           ) {
             return {
               type: "checkbox",
-              label: element.parentNode?.parentNode?.textContent?.trim() ?? "",
+              label: normalizeWhitespace(
+                element.parentNode?.parentNode?.textContent?.trim() ?? "",
+              ),
             } as InputType;
           }
 
@@ -846,7 +1018,9 @@ class InteractiveQuestionProcessor {
           ) {
             return {
               type: "radio",
-              label: element.parentNode?.parentNode?.textContent?.trim() ?? "",
+              label: normalizeWhitespace(
+                element.parentNode?.parentNode?.textContent?.trim() ?? "",
+              ),
             } as InputType;
           }
 
@@ -863,8 +1037,15 @@ class InteractiveQuestionProcessor {
   /**
    * Handle activities with no input elements
    */
-  private async handleNoInputActivity(): Promise<void> {
+  private async handleNoInputActivity(
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     console.log("No input elements detected - checking for audio content");
+
+    activityStatus.update("Checking for audio content", {
+      type: "pending",
+      description: "Scanning for audio elements in activity",
+    });
 
     try {
       await this.activityFrame.waitForSelector(SELECTORS.AUDIO_BUTTON, {
@@ -872,11 +1053,24 @@ class InteractiveQuestionProcessor {
         visible: true,
       });
       console.log("Audio content detected");
+      activityStatus.update("Audio content detected", {
+        type: "pending",
+        description: "Found audio elements, waiting for interaction",
+      });
     } catch {
       console.log("No audio content found");
+      activityStatus.update("No audio content found", {
+        type: "pending",
+        description: "No interactive elements detected",
+      });
     }
 
     console.log("Advancing to next activity");
+
+    activityStatus.update("Advancing to next activity", {
+      type: "pending",
+      description: "Moving to the next activity",
+    });
 
     // Wait for the button to have opacity less than 100% (indicating it's pulsing/ready)
     await this.activityFrame.waitForFunction(() => {
@@ -890,6 +1084,12 @@ class InteractiveQuestionProcessor {
 
     // Click the button once it's in the pulsing state
     await this.activityFrame.click(".FrameRight");
+
+    activityStatus.update("Activity completed", {
+      type: "success",
+      description: "Successfully advanced to next activity",
+    });
+
     await this.automation.processCurrentActivity();
   }
 
@@ -1099,23 +1299,46 @@ ${questionText}`;
   /**
    * Complete the question activity
    */
-  private async completeQuestionActivity(previewFrame: Frame): Promise<void> {
+  private async completeQuestionActivity(
+    previewFrame: Frame,
+    activityStatus: ReturnType<typeof createStatus>,
+  ): Promise<void> {
     // Check if there are more questions
     if (await previewFrame.$(SELECTORS.NAV_BUTTON_LIST)) {
+      activityStatus.update("Moving to next question", {
+        type: "pending",
+        description: "Advancing to the next question in activity",
+      });
       await waitAndClick(previewFrame, "nextQuestion");
       await this.automation.processCurrentActivity();
       return;
     }
 
+    activityStatus.update("Submitting activity", {
+      type: "pending",
+      description: "Finalizing and submitting the activity",
+    });
+
     // Submit the current activity
     await this.activityFrame.click(SELECTORS.CHECK_BUTTON);
     await this.activityFrame.waitForSelector(SELECTORS.EXIT_AUDIO_BUTTON);
     await this.activityFrame.click(SELECTORS.FRAME_RIGHT);
+
+    activityStatus.update("Activity submitted successfully", {
+      type: "success",
+      description: "Activity completed and submitted",
+    });
+
     await this.automation.processCurrentActivity();
   }
 }
 
 // Maintain backward compatibility with the original function name
 export async function startCrawling(config: AutomationConfig) {
-  return startEducationalAutomation(config);
+  try {
+    await startEducationalAutomation(config);
+  } catch (error) {
+    console.error("Automation system failed:", error);
+    throw error;
+  }
 }

@@ -12,6 +12,7 @@ import { auth } from "@acme/auth";
 import type { WSServerMessageSchema } from "./message-schema";
 import { startCrawling } from "./crawling-logic";
 import { WSClientMessageSchema } from "./message-schema";
+import { normalizeWhitespace } from "./utils";
 
 const args = [
   "--no-sandbox",
@@ -50,6 +51,8 @@ await cluster.task((async ({ page, data }) => {
   // Use provided abortController or create a new one
   const abortController = data.abortController ?? new AbortController();
   console.log("Page updated");
+  // Expose the normalizeWhitespace function to the browser context
+  await page.exposeFunction("normalizeWhitespace", normalizeWhitespace);
   const prevTask = tasks.get(data.userId);
   tasks.set(data.userId, { ...prevTask, page, abortController });
 

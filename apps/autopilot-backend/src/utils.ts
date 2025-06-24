@@ -146,3 +146,25 @@ export function logToFile(...args: any[]): void {
     console.error("Failed to log to file:", error),
   );
 }
+
+/**
+ * Normalizes whitespace in text by replacing all whitespace characters
+ * (including zero-width spaces) with regular spaces, except for newlines.
+ * @param text The text to normalize
+ * @returns The normalized text
+ */
+export function normalizeWhitespace(text: string): string {
+  // Replace all Unicode whitespace characters except newlines (\n) and carriage returns (\r)
+  // This includes:
+  // - Regular spaces, tabs, form feeds, etc.
+  // - Zero-width spaces (\u200B)
+  // - Non-breaking spaces (\u00A0)
+  // - Em spaces, en spaces, thin spaces, etc.
+  // - Other Unicode whitespace characters
+  const normalized = text.replace(
+    /[\t\f\v \u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u200B\u200C\u200D\uFEFF]+/g,
+    " ",
+  );
+  console.log(`- Normalized: "${text}" --> "${normalized}"`);
+  return normalized;
+}
