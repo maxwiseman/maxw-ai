@@ -198,6 +198,7 @@ serve<WSData, {}>({
     });
   },
   websocket: {
+    idleTimeout: 12 * 60, // 12 hours in minutes
     open(ws) {
       const data = ws.data;
       const prevTask = tasks.get(data.auth.user.id);

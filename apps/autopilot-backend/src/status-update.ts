@@ -76,16 +76,12 @@ export class Status {
 const userStatuses: Record<string, Record<string, StatusUpdate>> = {};
 
 function addUserStatus(userId: string, status: StatusUpdate) {
-  if (!userStatuses[userId]) {
-    userStatuses[userId] = {};
-  }
+  userStatuses[userId] ??= {};
   userStatuses[userId][status.id] = status;
 }
 
 function updateUserStatus(userId: string, status: StatusUpdate) {
-  if (!userStatuses[userId]) {
-    userStatuses[userId] = {};
-  }
+  userStatuses[userId] ??= {};
   userStatuses[userId][status.id] = status;
 }
 

@@ -6,7 +6,6 @@ import type { Frame, Page } from "puppeteer";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, generateText } from "ai";
 import { sleep } from "bun";
-import { Mouse } from "puppeteer";
 import { z } from "zod";
 
 import { eq } from "@acme/db";
