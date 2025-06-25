@@ -76,6 +76,15 @@ export function useLiveState() {
   const ws = useWebsocket(`${env.NEXT_PUBLIC_BACKEND_URL}/ws`, {
     reconnectAttempts: 3,
     shouldReconnect: () => true,
+    onError: (event) => {
+      console.error("WebSocket error:", event);
+    },
+    onClose: (event) => {
+      console.log("WebSocket closed:", event);
+    },
+    onOpen: () => {
+      console.log("WebSocket opened");
+    },
   });
   const stateStore = useStateStore();
 
