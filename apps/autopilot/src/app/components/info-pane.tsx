@@ -40,8 +40,8 @@ function StatusList({ statuses }: { statuses: StatusUpdate[] }) {
           <motion.div
             layout="position"
             key={status.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            // initial={{ opacity: 0, y: 10 }}
+            // animate={{ opacity: 1, y: 0 }}
             className="bg-card flex items-start gap-3 rounded-lg border p-3"
           >
             <div className="mt-1.5">

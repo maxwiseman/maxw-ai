@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
+import { isEqual } from "lodash";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -45,10 +46,14 @@ export function useConfiguration() {
       configQuery.data !== "Unauthorized"
     )
       updateStore(nullsToUndefined(configQuery.data));
-  }, [configQuery.isFetched]);
+  }, [configQuery.data, configQuery.isFetched, updateStore]);
 
   useEffect(() => {
-    if (debounced === JSON.stringify(configStore) && configQuery.isFetched) {
+    if (
+      debounced === JSON.stringify(configStore) &&
+      configQuery.isFetched &&
+      !isEqual(JSON.parse(debounced), configQuery.data)
+    ) {
       console.log("Updating DB");
       updateMutation.mutate({ ...configStore.serviceCredentials });
     }
