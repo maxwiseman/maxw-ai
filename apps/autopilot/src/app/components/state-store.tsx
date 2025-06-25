@@ -1,5 +1,8 @@
+"use client";
+
+import type { ReactNode } from "react";
 import type { z } from "zod";
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 import useWebsocket, { ReadyState } from "react-use-websocket";
 import { create } from "zustand";
 
@@ -72,7 +75,15 @@ export const useStateStore = create<AutopilotState>()((set, get) => ({
   },
 }));
 
-export function useLiveState() {
+// Create a context for the WebSocket connection
+interface WebSocketContextType {
+  sendMessage: (data: z.input<typeof WSClientMessageSchema>) => void;
+}
+
+const WebSocketContext = createContext<WebSocketContextType | null>(null);
+
+// WebSocket Provider Component
+export function WebSocketProvider({ children }: { children: ReactNode }) {
   const ws = useWebsocket(`${env.NEXT_PUBLIC_BACKEND_URL}/ws`, {
     reconnectAttempts: 3,
     shouldReconnect: () => true,
@@ -86,7 +97,6 @@ export function useLiveState() {
       console.log("WebSocket opened");
     },
   });
-  const stateStore = useStateStore();
 
   useEffect(() => {
     if (
@@ -107,27 +117,27 @@ export function useLiveState() {
       const parsedMessage = WSServerMessageSchema.parse(ws.lastJsonMessage);
 
       if (parsedMessage.type === "newState") {
-        stateStore.updateState(parsedMessage.state);
+        useStateStore.getState().updateState(parsedMessage.state);
 
         // Clear local statuses when automation starts fresh
         if (
           parsedMessage.state.status === "running" &&
-          stateStore.status === "stopped"
+          useStateStore.getState().status === "stopped"
         ) {
-          stateStore.clearStatuses();
+          useStateStore.getState().clearStatuses();
         }
       } else if (parsedMessage.type === "statusUpdate") {
         // Check if this status already exists (update) or is new (add)
-        const existingStatus = stateStore.statuses.find(
-          (s) => s.id === parsedMessage.status.id,
-        );
+        const existingStatus = useStateStore
+          .getState()
+          .statuses.find((s) => s.id === parsedMessage.status.id);
         if (existingStatus) {
-          stateStore.updateStatus(parsedMessage.status);
+          useStateStore.getState().updateStatus(parsedMessage.status);
         } else {
-          stateStore.addStatus(parsedMessage.status);
+          useStateStore.getState().addStatus(parsedMessage.status);
         }
       } else if (parsedMessage.type === "statusList") {
-        stateStore.setStatuses(parsedMessage.statuses);
+        useStateStore.getState().setStatuses(parsedMessage.statuses);
       }
     } catch (error) {
       console.warn("Failed to parse websocket message:", error);
@@ -135,7 +145,7 @@ export function useLiveState() {
   }, [ws.lastJsonMessage]);
 
   useEffect(() => {
-    stateStore.updateState({
+    useStateStore.getState().updateState({
       wsStatus: {
         [ReadyState.CONNECTING]: "connecting" as const,
         [ReadyState.OPEN]: "connected" as const,
@@ -146,10 +156,49 @@ export function useLiveState() {
     });
   }, [ws.readyState]);
 
-  return {
-    ...stateStore,
+  const contextValue: WebSocketContextType = {
     sendMessage: (data: z.input<typeof WSClientMessageSchema>) => {
       ws.sendJsonMessage(data);
     },
+  };
+
+  return (
+    <WebSocketContext.Provider value={contextValue}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+}
+
+// Hook for components to access WebSocket functionality
+export function useWebSocketConnection() {
+  const context = useContext(WebSocketContext);
+  if (!context) {
+    throw new Error(
+      "useWebSocketConnection must be used within a WebSocketProvider",
+    );
+  }
+  return context;
+}
+
+// Simplified hook for accessing state only
+export function useLiveState() {
+  const stateStore = useStateStore();
+  const context = useContext(WebSocketContext);
+
+  // If no WebSocket context, return state-only version
+  if (!context) {
+    return {
+      ...stateStore,
+      sendMessage: () => {
+        console.warn(
+          "WebSocket not available - ensure component is wrapped in WebSocketProvider",
+        );
+      },
+    };
+  }
+
+  return {
+    ...stateStore,
+    sendMessage: context.sendMessage,
   };
 }
