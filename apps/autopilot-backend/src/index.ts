@@ -1,3 +1,4 @@
+import type { ServerWebSocket } from "bun";
 import type { LaunchOptions, Page } from "puppeteer";
 import type { TaskFunction } from "puppeteer-cluster/dist/Cluster";
 import type { z } from "zod";
@@ -12,6 +13,7 @@ import { auth } from "@acme/auth";
 import type { WSServerMessageSchema } from "./message-schema";
 import { startCrawling } from "./crawling-logic";
 import { WSClientMessageSchema } from "./message-schema";
+import { clearUserStatuses, getUserStatuses } from "./status-update";
 import { normalizeWhitespace } from "./utils";
 
 const args = [
@@ -106,6 +108,33 @@ const tasks = new Map<
     abortController?: AbortController;
   }
 >();
+
+// Store active websocket connections for heartbeat
+const activeConnections = new Map<
+  string,
+  { ws: ServerWebSocket<WSData>; userId: string }
+>();
+
+// Heartbeat interval to keep websocket connections alive
+const heartbeatInterval = setInterval(() => {
+  activeConnections.forEach(({ ws }, connectionId) => {
+    try {
+      // Send a simple ping message to keep the connection alive
+      ws.send(JSON.stringify({ type: "ping", timestamp: Date.now() }));
+    } catch {
+      console.log(
+        `Failed to send heartbeat to connection ${connectionId}, removing from active connections`,
+      );
+      activeConnections.delete(connectionId);
+    }
+  });
+}, 30000); // 30 seconds
+
+// Cleanup heartbeat interval on process exit
+process.on("SIGINT", () => {
+  clearInterval(heartbeatInterval);
+  process.exit(0);
+});
 
 serve<WSData, {}>({
   port: 8080,
@@ -209,22 +238,33 @@ serve<WSData, {}>({
 
       tasks.set(data.auth.user.id, { ...prevTask, sendMessage });
 
-      if (!prevTask) {
-        console.log("no previous task");
-        return;
+      // Send current automation state if running
+      if (prevTask?.page) {
+        sendMessage({ type: "newState", state: { status: "running" } });
+      } else {
+        sendMessage({ type: "newState", state: { status: "stopped" } });
       }
 
-      if (prevTask.page)
-        sendMessage({ type: "newState", state: { status: "running" } });
+      // Send all accumulated status updates to sync the client
+      const userStatuses = getUserStatuses(data.auth.user.id);
+      if (userStatuses.length > 0) {
+        sendMessage({ type: "statusList", statuses: userStatuses });
+      }
 
-      if ((prevTask.messages?.length ?? 0) > 0)
-        ws.send(JSON.stringify(prevTask.messages));
+      // Add to active connections
+      activeConnections.set(data.auth.user.id, {
+        ws,
+        userId: data.auth.user.id,
+      });
     },
     close(ws) {
       const prevTask = tasks.get(ws.data.auth.user.id);
       if (!prevTask) return;
 
       tasks.set(ws.data.auth.user.id, { ...prevTask, sendMessage: undefined });
+
+      // Remove from active connections
+      activeConnections.delete(ws.data.auth.user.id);
     },
     async message(ws, msg) {
       function sendMessage(data: z.infer<typeof WSServerMessageSchema>) {
@@ -237,6 +277,9 @@ serve<WSData, {}>({
         await JSON.parse(msg as string),
       );
       if (parsedMsg.type === "start") {
+        // Clear old status updates when starting a new session
+        clearUserStatuses(ws.data.auth.user.id);
+
         cluster
           .execute({
             userId: ws.data.auth.user.id,

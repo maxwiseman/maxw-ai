@@ -85,7 +85,7 @@ function updateUserStatus(userId: string, status: StatusUpdate) {
   userStatuses[userId][status.id] = status;
 }
 
-function getUserStatuses(userId: string): StatusUpdate[] {
+export function getUserStatuses(userId: string): StatusUpdate[] {
   if (!userStatuses[userId]) {
     return [];
   }
@@ -94,7 +94,7 @@ function getUserStatuses(userId: string): StatusUpdate[] {
   );
 }
 
-function clearUserStatuses(userId: string) {
+export function clearUserStatuses(userId: string) {
   if (userStatuses[userId]) {
     userStatuses[userId] = {};
   }

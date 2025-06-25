@@ -87,11 +87,26 @@ export function useLiveState() {
     )
       return;
 
+    // Ignore ping messages (heartbeat from server)
+    if (
+      (ws.lastJsonMessage as { type?: string } | undefined)?.type === "ping"
+    ) {
+      return;
+    }
+
     try {
       const parsedMessage = WSServerMessageSchema.parse(ws.lastJsonMessage);
 
       if (parsedMessage.type === "newState") {
         stateStore.updateState(parsedMessage.state);
+
+        // Clear local statuses when automation starts fresh
+        if (
+          parsedMessage.state.status === "running" &&
+          stateStore.status === "stopped"
+        ) {
+          stateStore.clearStatuses();
+        }
       } else if (parsedMessage.type === "statusUpdate") {
         // Check if this status already exists (update) or is new (add)
         const existingStatus = stateStore.statuses.find(
