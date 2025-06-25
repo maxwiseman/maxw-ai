@@ -100,6 +100,36 @@ export function clearUserStatuses(userId: string) {
   }
 }
 
+export function markPendingStatusesAsError(
+  userId: string,
+  sendMessage: (data: z.infer<typeof WSServerMessageSchema>) => void,
+) {
+  if (!userStatuses[userId]) {
+    return;
+  }
+
+  // Find all pending statuses and mark them as errors
+  Object.values(userStatuses[userId]).forEach((status) => {
+    if (status.type === "pending") {
+      const updatedStatus: StatusUpdate = {
+        ...status,
+        type: "error",
+        description: "Automation stopped",
+        timestamp: Date.now(),
+      };
+
+      // Update in storage
+      userStatuses[userId]![status.id] = updatedStatus;
+
+      // Send update to client
+      sendMessage({
+        type: "statusUpdate",
+        status: updatedStatus,
+      });
+    }
+  });
+}
+
 export function createStatus(
   userId: string,
   message: string,

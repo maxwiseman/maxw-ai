@@ -13,7 +13,11 @@ import { auth } from "@acme/auth";
 import type { WSServerMessageSchema } from "./message-schema";
 import { startCrawling } from "./crawling-logic";
 import { WSClientMessageSchema } from "./message-schema";
-import { clearUserStatuses, getUserStatuses } from "./status-update";
+import {
+  clearUserStatuses,
+  getUserStatuses,
+  markPendingStatusesAsError,
+} from "./status-update";
 import { normalizeWhitespace } from "./utils";
 
 const args = [
@@ -78,6 +82,9 @@ await cluster.task((async ({ page, data }) => {
       abortPromise,
     ]);
   } finally {
+    // Mark all pending statuses as errors when automation stops
+    markPendingStatusesAsError(data.userId, data.sendMessage);
+
     tasks.delete(data.userId);
     data.sendMessage({ type: "newState", state: { status: "stopped" } });
   }
@@ -289,6 +296,10 @@ serve<WSData, {}>({
       }
       if (parsedMsg.type === "stop") {
         if (!prevTask) return;
+
+        // Mark all pending statuses as errors when manually stopping
+        markPendingStatusesAsError(ws.data.auth.user.id, sendMessage);
+
         sendMessage({ type: "newState", state: { status: "stopped" } });
         prevTask.abortController?.abort();
         await prevTask.page?.close();
