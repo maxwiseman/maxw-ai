@@ -236,21 +236,21 @@ export const modelProviders = defineProviders({
   },
   "gemini-2.5-flash-lite": {
     google: ({ features }) => ({
-      model: google("gemini-2.5-flash-lite"),
+      model: google("gemini-2.5-flash-lite-preview-06-17"),
       providerOptions: {
         google: {
           useSearchGrounding: features.searchToggle?.enabled ?? false,
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    gateway: ({ features }) => ({
-      model: gateway("google/gemini-2.5-flash-lite"),
-      providerOptions: {
-        google: {
-          useSearchGrounding: features.searchToggle?.enabled ?? false,
-        } satisfies GoogleGenerativeAIProviderOptions,
-      },
-    }),
+    // gateway: ({ features }) => ({
+    //   model: gateway("google/gemini-2.5-flash-lite"),
+    //   providerOptions: {
+    //     google: {
+    //       useSearchGrounding: features.searchToggle?.enabled ?? false,
+    //     } satisfies GoogleGenerativeAIProviderOptions,
+    //   },
+    // }),
   },
   "gemini-2.5-flash": {
     google: ({ features }) => ({
