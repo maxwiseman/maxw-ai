@@ -27,8 +27,8 @@
   },
   "prettier": "@acme/prettier-config",
   "dependencies": {
-    "@ai-sdk/openai": "2.0.0-alpha.10",
-    "ai": "5.0.0-alpha.10",
+    "@ai-sdk/openai": "2.0.0-beta.1",
+    "ai": "5.0.0-beta.1",
     "markdown-it": "^14.1.0",
     "puppeteer": "^24.7.2",
     "puppeteer-cluster": "^0.24.0",

@@ -1,6 +1,6 @@
 import type { UIDataTypes, UIMessage } from "ai";
 import { headers } from "next/headers";
-import { gateway } from "@vercel/ai-sdk-gateway";
+import { gateway } from "@ai-sdk/gateway";
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
           sendReasoning: true,
           sendSources: true,
           sendFinish: false,
-          newMessageId: crypto.randomUUID(),
+          // newMessageId: crypto.randomUUID(),
           originalMessages: data.messages,
           onFinish: (finishData) => {
             (async () => {

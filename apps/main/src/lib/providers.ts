@@ -1,12 +1,12 @@
 import type { AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
+import { gateway } from "@ai-sdk/gateway";
 import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 import { openai } from "@ai-sdk/openai";
 import { perplexity } from "@ai-sdk/perplexity";
 import { xai } from "@ai-sdk/xai";
-import { gateway } from "@vercel/ai-sdk-gateway";
 import { extractReasoningMiddleware, wrapLanguageModel } from "ai";
 
 import { env } from "~/env";
@@ -46,9 +46,13 @@ export const modelProviders = defineProviders({
       system: features.searchToggle?.enabled
         ? "Use your web search tool to find the most relevant information."
         : undefined,
-      tools: features.searchToggle?.enabled
-        ? { web_search_preview: openai.tools.webSearchPreview() }
-        : undefined,
+      // tools: features.searchToggle?.enabled
+      //   ? {
+      //       web_search_preview: openai.tools.webSearchPreview({
+      //         searchContextSize: "medium",
+      //       }),
+      //     }
+      //   : undefined,
     }),
     gateway: gateway("openai/gpt-4o"),
   },
@@ -58,9 +62,13 @@ export const modelProviders = defineProviders({
       system: features.searchToggle?.enabled
         ? "Use your web search tool to find the most relevant information."
         : undefined,
-      tools: features.searchToggle?.enabled
-        ? { web_search_preview: openai.tools.webSearchPreview() }
-        : undefined,
+      // tools: features.searchToggle?.enabled
+      //   ? {
+      //       web_search_preview: openai.tools.webSearchPreview({
+      //         searchContextSize: "medium",
+      //       }),
+      //     }
+      //   : undefined,
     }),
     gateway: gateway("openai/gpt-4o-mini"),
   },
@@ -338,6 +346,9 @@ export const modelProviders = defineProviders({
     }),
   },
   "qwen-3-32b": {
-    gateway: gateway("alibaba/qwen-3-32b"),
+    gateway: wrapLanguageModel({
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+      model: gateway("alibaba/qwen-3-32b"),
+    }),
   },
 });
