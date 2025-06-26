@@ -196,7 +196,7 @@ export const modelProviders = defineProviders({
       },
     }),
     gateway: ({ features }) => ({
-      model: gateway("anthropic/claude-4-sonnet-20250514"),
+      model: gateway("anthropic/claude-4-sonnet"),
       providerOptions: {
         anthropic: {
           thinking: features.thinkToggle?.enabled
@@ -208,7 +208,7 @@ export const modelProviders = defineProviders({
   },
   "claude-opus-4": {
     gateway: ({ features }) => ({
-      model: gateway("anthropic/claude-4-opus-20250514"),
+      model: gateway("anthropic/claude-4-opus"),
       providerOptions: {
         anthropic: {
           thinking: features.thinkToggle?.enabled
@@ -220,29 +220,29 @@ export const modelProviders = defineProviders({
   },
   "grok-3": {
     xai: xai("grok-3-latest"),
-    gateway: gateway("xai/grok-3-beta"),
+    gateway: gateway("xai/grok-3"),
   },
   "grok-3-mini": {
     xai: xai("grok-3-mini-latest"),
-    gateway: gateway("xai/grok-3-mini-beta"),
+    gateway: gateway("xai/grok-3-mini"),
   },
   "gemini-2.5-flash-lite": {
     google: ({ features }) => ({
-      model: google("gemini-2.5-flash-lite-preview-06-17"),
+      model: google("gemini-2.5-flash-lite"),
       providerOptions: {
         google: {
           useSearchGrounding: features.searchToggle?.enabled ?? false,
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    // gateway: ({ features }) => ({
-    //   model: gateway("vertex/gemini-2.5-flash-lite-preview-06-17"),
-    //   providerOptions: {
-    //     google: {
-    //       useSearchGrounding: features.searchToggle?.enabled ?? false,
-    //     } satisfies GoogleGenerativeAIProviderOptions,
-    //   },
-    // }),
+    gateway: ({ features }) => ({
+      model: gateway("google/gemini-2.5-flash-lite"),
+      providerOptions: {
+        google: {
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
   },
   "gemini-2.5-flash": {
     google: ({ features }) => ({
@@ -257,7 +257,18 @@ export const modelProviders = defineProviders({
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    // gateway: gateway("vertex/gemini-2.5-flash"),
+    gateway: ({ features }) => ({
+      model: gateway("google/gemini-2.5-flash"),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: features.thinkToggle?.enabled ?? false,
+            thinkingBudget: features.thinkToggle?.enabled ? 12000 : 0,
+          },
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
   },
   "gemini-2.5-pro": {
     google: ({ features }) => ({
@@ -272,27 +283,38 @@ export const modelProviders = defineProviders({
         } satisfies GoogleGenerativeAIProviderOptions,
       },
     }),
-    // gateway: gateway("vertex/gemini-2.5-pro"),
+    gateway: ({ features }) => ({
+      model: gateway("google/gemini-2.5-pro"),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: 12000,
+          },
+          useSearchGrounding: features.searchToggle?.enabled ?? false,
+        } satisfies GoogleGenerativeAIProviderOptions,
+      },
+    }),
   },
   "llama-4-scout": {
     groq: groq("llama-4-scout-17b-16e-instruct"),
-    gateway: gateway("groq/llama-4-scout-17b-16e-instruct"),
+    gateway: gateway("meta/llama-4-scout"),
   },
   "llama-4-maverick": {
     groq: groq("meta-llama/llama-4-maverick-17b-128e-instruct"),
-    gateway: gateway("vertex/llama-4-maverick-17b-128e-instruct-maas"),
+    gateway: gateway("meta/llama-4-maverick"),
   },
   "llama-3.3-70b": {
     groq: groq("llama-3.3-70b-versatile"),
-    gateway: gateway("groq/llama-3.3-70b-versatile"),
+    gateway: gateway("meta/llama-3.3-70b"),
   },
   "deepseek-v3": {
-    gateway: gateway("fireworks/deepseek-v3"),
+    gateway: gateway("deepseek/deepseek-v3"),
   },
   "deepseek-r1": {
     gateway: wrapLanguageModel({
       middleware: extractReasoningMiddleware({ tagName: "think" }),
-      model: gateway("fireworks/deepseek-r1"),
+      model: gateway("deepseek/deepseek-r1"),
     }),
   },
   "deepseek-r1-distill": {
@@ -302,7 +324,7 @@ export const modelProviders = defineProviders({
     }),
     gateway: wrapLanguageModel({
       middleware: extractReasoningMiddleware({ tagName: "think" }),
-      model: gateway("groq/deepseek-r1-distill-llama-70b"),
+      model: gateway("deepseek/deepseek-r1-distill-llama-70b"),
     }),
   },
   "qwen-qwq-32b": {
@@ -312,10 +334,10 @@ export const modelProviders = defineProviders({
     }),
     gateway: wrapLanguageModel({
       middleware: extractReasoningMiddleware({ tagName: "think" }),
-      model: gateway("groq/qwen-qwq-32b"),
+      model: gateway("alibaba/qwq-32b"),
     }),
   },
   "qwen-3-32b": {
-    gateway: gateway("cerebras/qwen-3-32b"),
+    gateway: gateway("alibaba/qwen-3-32b"),
   },
 });
