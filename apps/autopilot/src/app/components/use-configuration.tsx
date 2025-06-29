@@ -10,6 +10,7 @@ import { getConfiguration, updateConfiguration } from "./actions";
 
 export interface configurationStore {
   serviceCredentials: { username: string; password: string };
+  timePerWord: number;
   setConfiguration: (newConfig: Partial<configurationStore>) => void;
 }
 
@@ -17,6 +18,7 @@ const useConfigurationStore = create<configurationStore>()(
   persist(
     (set) => ({
       serviceCredentials: { username: "", password: "" },
+      timePerWord: 0.1,
       setConfiguration: (newConfig) => set(newConfig),
     }),
     { name: "configuration-storage" },
@@ -55,7 +57,10 @@ export function useConfiguration() {
       !isEqual(JSON.parse(debounced), configQuery.data)
     ) {
       console.log("Updating DB");
-      updateMutation.mutate({ ...configStore.serviceCredentials });
+      updateMutation.mutate({
+        ...configStore.serviceCredentials,
+        ...configStore,
+      });
     }
   }, [debounced]);
 

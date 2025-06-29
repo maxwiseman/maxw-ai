@@ -70,6 +70,7 @@ export async function getConfiguration() {
 export async function updateConfiguration(config: {
   username: string;
   password: string;
+  timePerWord: number;
 }) {
   const authData = await auth.api.getSession({ headers: await headers() });
   if (!authData?.user) return "Unauthorized";
@@ -84,6 +85,7 @@ export async function updateConfiguration(config: {
       target: [configuration.userId],
       set: {
         serviceCredentials: config,
+        ...config,
       },
     });
 }

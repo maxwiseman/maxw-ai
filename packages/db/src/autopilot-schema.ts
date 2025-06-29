@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
-  index,
   integer,
+  real,
   sqliteTableCreator,
   text,
   uniqueIndex,
@@ -40,4 +40,5 @@ export const configuration = sqliteTable("configuration", {
     username: string;
     password: string;
   }>(),
+  timePerWord: real("time_per_word").default(0.1),
 });

@@ -21,6 +21,13 @@ import {
   waitAndType,
 } from "./utils";
 
+// Utility function to count words in text
+function countWords(text: string): number {
+  return normalizeWhitespace(text)
+    .split(/\s+/)
+    .filter((word) => word.length > 0).length;
+}
+
 // Constants
 const LOGIN_URL =
   "https://account.activedirectory.windowsazure.com/applications/signin/6be35607-d39b-4ec5-8b6f-bb7ec0fdc57a?tenantId=a2c165ce-3db2-4317-b742-8b26460ec108";
@@ -109,6 +116,8 @@ export async function startEducationalAutomation(config: AutomationConfig) {
  * Main automation class that handles the educational platform workflow
  */
 class EducationalPlatformAutomation {
+  private config: typeof configuration.$inferSelect | null = null;
+
   constructor(
     private page: Page,
     private userId: string,
@@ -119,10 +128,10 @@ class EducationalPlatformAutomation {
    * Initialize and start the automation process
    */
   async initialize(): Promise<void> {
-    const credentials = await this.loadUserCredentials();
-    if (!credentials) {
+    this.config = await this.loadUserConfig();
+    if (!this.config?.serviceCredentials) {
       console.error("Invalid configuration - missing credentials");
-      const errorStatus = createStatus(
+      createStatus(
         this.userId,
         "Configuration Error",
         { type: "error", description: "Missing authentication credentials" },
@@ -131,26 +140,31 @@ class EducationalPlatformAutomation {
       return;
     }
 
-    await this.authenticateUser(credentials);
+    await this.authenticateUser();
     await this.startActivityLoop();
   }
 
   /**
    * Load user credentials from database
    */
-  private async loadUserCredentials(): Promise<LoginCredentials | null> {
+  private async loadUserConfig(): Promise<
+    typeof configuration.$inferSelect | null
+  > {
     const configurationData = await db.query.configuration.findFirst({
       where: eq(configuration.userId, this.userId),
     });
 
-    return configurationData?.serviceCredentials ?? null;
+    return configurationData ?? null;
   }
 
   /**
    * Handle user authentication flow
    */
-  private async authenticateUser(credentials: LoginCredentials): Promise<void> {
-    const { username, password } = credentials;
+  private async authenticateUser(): Promise<void> {
+    if (!this.config?.serviceCredentials) {
+      throw new Error("Configuration not loaded or missing credentials");
+    }
+    const { username, password } = this.config.serviceCredentials;
 
     if (!this.page) {
       throw new Error("Browser page not available");
@@ -511,6 +525,7 @@ class EducationalPlatformAutomation {
       this.page,
       this,
       this.sendMessage,
+      this.config,
     );
     await questionProcessor.processQuestions(activityStatus);
   }
@@ -525,6 +540,7 @@ class InteractiveQuestionProcessor {
     private page: Page,
     private automation: EducationalPlatformAutomation,
     private sendMessage: (data: z.infer<typeof WSServerMessageSchema>) => void,
+    private config: typeof configuration.$inferSelect | null,
   ) {}
 
   /**
@@ -581,6 +597,9 @@ class InteractiveQuestionProcessor {
   async processDefaultQuestion(
     activityStatus: ReturnType<typeof createStatus>,
   ): Promise<void> {
+    // Record start time for timing calculation
+    const startTime = Date.now();
+
     // Get preview frame
     const previewElement = await this.activityFrame
       .waitForSelector(SELECTORS.IFRAME_PREVIEW)
@@ -610,6 +629,15 @@ class InteractiveQuestionProcessor {
 
     const { questionText, inputSchema, questionElement } = questionData;
 
+    // Calculate required wait time based on word count and timePerWord config
+    const wordCount = countWords(questionText);
+    const timePerWord = this.config?.timePerWord ?? 1;
+    const requiredWaitTimeMs = wordCount * timePerWord * 1000; // Convert to milliseconds
+
+    console.log(
+      `Interactive question activity: ${wordCount} words × ${timePerWord}s = ${requiredWaitTimeMs}ms wait time`,
+    );
+
     // Handle case with no inputs
     if (inputSchema.length === 0) {
       await this.handleNoInputActivity(activityStatus);
@@ -621,13 +649,27 @@ class InteractiveQuestionProcessor {
       description: "Using AI to answer the questions",
     });
 
-    // Generate and apply answers
-    await this.generateAndApplyAnswers(
+    // Generate answers
+    const answers = await this.generateAnswers(
       questionText,
       inputSchema,
-      questionElement,
       previewElement ?? questionElement,
     );
+
+    // Wait for the required time if not enough time has elapsed
+    const elapsedTime = Date.now() - startTime;
+    if (elapsedTime < requiredWaitTimeMs) {
+      const remainingWaitTime = requiredWaitTimeMs - elapsedTime;
+      console.log(`Waiting ${remainingWaitTime}ms before applying answers`);
+      activityStatus.update("Waiting before applying answers", {
+        type: "pending",
+        description: `Waiting ${Math.round(remainingWaitTime / 1000)}s before submitting (${wordCount} words × ${timePerWord}s)`,
+      });
+      await sleep(remainingWaitTime);
+    }
+
+    // Apply the generated answers
+    await this.applyAnswersToForm(answers, inputSchema, questionElement);
 
     // Complete the activity
     await this.completeQuestionActivity(previewFrame, activityStatus);
@@ -639,6 +681,9 @@ class InteractiveQuestionProcessor {
   private async processDragDropColumns(
     activityStatus: ReturnType<typeof createStatus>,
   ): Promise<void> {
+    // Record start time for timing calculation
+    const startTime = Date.now();
+
     // Get preview frame
     const previewElement = await this.activityFrame
       .waitForSelector(SELECTORS.IFRAME_PREVIEW)
@@ -650,6 +695,15 @@ class InteractiveQuestionProcessor {
     const questionText = await previewFrame.$eval(
       SELECTORS.CONTENT_CONTAINER,
       (item) => normalizeWhitespace(item.textContent?.trim() ?? ""),
+    );
+
+    // Calculate required wait time based on word count and timePerWord config
+    const wordCount = countWords(questionText);
+    const timePerWord = this.config?.timePerWord ?? 1;
+    const requiredWaitTimeMs = wordCount * timePerWord * 1000; // Convert to milliseconds
+
+    console.log(
+      `Drag and drop activity: ${wordCount} words × ${timePerWord}s = ${requiredWaitTimeMs}ms wait time`,
     );
 
     // Get drag drop column elements and their text content
@@ -738,6 +792,20 @@ class InteractiveQuestionProcessor {
     });
 
     console.log("Responses:", responses.object);
+
+    // Wait for the required time if not enough time has elapsed
+    const elapsedTime = Date.now() - startTime;
+    if (elapsedTime < requiredWaitTimeMs) {
+      const remainingWaitTime = requiredWaitTimeMs - elapsedTime;
+      console.log(
+        `Waiting ${remainingWaitTime}ms before performing drag and drop operations`,
+      );
+      activityStatus.update("Waiting before performing drag and drop", {
+        type: "pending",
+        description: `Waiting ${Math.round(remainingWaitTime / 1000)}s before moving tiles (${wordCount} words × ${timePerWord}s)`,
+      });
+      await sleep(remainingWaitTime);
+    }
 
     activityStatus.update("Performing drag and drop operations", {
       type: "pending",
@@ -1093,14 +1161,13 @@ class InteractiveQuestionProcessor {
   }
 
   /**
-   * Generate AI answers and apply them to form inputs
+   * Generate AI answers for form inputs
    */
-  private async generateAndApplyAnswers(
+  private async generateAnswers(
     questionText: string,
     inputSchema: InputType[],
-    questionElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
     previewElement: NonNullable<Awaited<ReturnType<Frame["$"]>>>,
-  ): Promise<void> {
+  ): Promise<Record<string, unknown>> {
     // Create Zod schema for AI response validation
     const zodSchema = this.createResponseSchema(inputSchema);
 
@@ -1108,6 +1175,7 @@ class InteractiveQuestionProcessor {
     const screenshot = await previewElement?.screenshot({
       path: "./screenshot.png",
     });
+    console.log("Screenshot taken", screenshot);
 
     // Generate AI response
     const answer = await generateObject({
@@ -1128,7 +1196,7 @@ class InteractiveQuestionProcessor {
             },
             {
               type: "image",
-              image: screenshot ?? "",
+              image: screenshot.toBase64() ?? "",
             },
           ],
         },
@@ -1136,9 +1204,7 @@ class InteractiveQuestionProcessor {
     });
 
     console.log("Generated answers:", answer.object);
-
-    // Apply answers to form elements
-    await this.applyAnswersToForm(answer.object, inputSchema, questionElement);
+    return answer.object;
   }
 
   /**

@@ -68,6 +68,20 @@ export function Configuration() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex w-full items-center justify-between text-sm font-medium">
+            Seconds per word
+            <Input
+              value={config.timePerWord}
+              onChange={(e) => {
+                config.setConfiguration({
+                  timePerWord: Number(e.target.value),
+                });
+              }}
+              type="number"
+              placeholder="1s"
+              className="w-14 [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </div>
+          <div className="flex w-full items-center justify-between text-sm font-medium">
             Complete quizzes
             <Switch
               disabled
