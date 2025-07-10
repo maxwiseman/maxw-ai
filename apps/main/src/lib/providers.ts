@@ -226,9 +226,9 @@ export const modelProviders = defineProviders({
       },
     }),
   },
-  "grok-3": {
-    xai: xai("grok-3-latest"),
-    gateway: gateway("xai/grok-3"),
+  "grok-4": {
+    xai: xai("grok-4-latest"),
+    gateway: gateway("xai/grok-4"),
   },
   "grok-3-mini": {
     xai: xai("grok-3-mini-latest"),

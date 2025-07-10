@@ -309,10 +309,10 @@ export const models = defineModels({
     url: "https://console.groq.com/playground?model=deepseek-r1-distill-llama-70b",
     features: [modelFeatures.thinkRequired],
   },
-  "grok-3": {
-    name: "Grok 3",
+  "grok-4": {
+    name: "Grok 4",
     description:
-      "xAI's flagship model that excels at enterprise use cases like data extraction, coding, and text summarization. Possesses deep domain knowledge in finance, healthcare, law, and science.",
+      "xAI's latest and greatest flagship model, offering unparalleled performance in natural language, math and reasoning - the perfect jack of all trades.",
     brand: modelBrands.xai,
     url: "https://docs.x.ai/docs/models",
   },
