@@ -785,7 +785,7 @@ class InteractiveQuestionProcessor {
               type: "text",
               text: `Sort the tiles into the correct columns. The question is: ${questionText}`,
             },
-            { type: "image", image: screenshot ?? "" },
+            { type: "image", image: screenshot?.toBase64() ?? "" },
           ],
         },
       ],
