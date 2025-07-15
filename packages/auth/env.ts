@@ -7,9 +7,11 @@ export const env = createEnv({
     VERCEL_URL: z.string().min(1).optional(),
     VERCEL_PROJECT_PRODUCTION_URL: z.string().min(1).optional(),
     VERCEL_BRANCH_URL: z.string().min(1).optional(),
-    AUTH_GITHUB_ID: z.string().min(1),
     BETTER_AUTH_URL: z.string().min(1),
+    AUTH_GITHUB_ID: z.string().min(1),
     AUTH_GITHUB_SECRET: z.string().min(1),
+    AUTH_GOOGLE_ID: z.string().min(1).optional(),
+    AUTH_GOOGLE_SECRET: z.string().min(1).optional(),
     AUTH_SECRET:
       process.env.NODE_ENV === "production"
         ? z.string().min(1)

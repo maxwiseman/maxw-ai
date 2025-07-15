@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./card";
-import { GithubIcon, PasskeyIcon } from "./custom-icons";
+import { GithubIcon, GoogleIcon, PasskeyIcon } from "./custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -139,6 +139,16 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
             <PasskeyIcon className="size-5" />
             Sign in with Passkey
           </Button>
+          <Button
+            onClick={async () => {
+              await authClient.signIn.social({ provider: "google" });
+            }}
+            variant="outline"
+            className="w-full"
+          >
+            <GoogleIcon className="size-5" />
+            Sign in with Google
+          </Button>
         </div>
         <DialogFooter className="bg-muted/60 shadow-inset-lg border-t p-6 py-4">
           <Button
@@ -249,6 +259,16 @@ export function AuthCard() {
         <Button disabled variant="outline" className="w-full">
           <PasskeyIcon className="size-5" />
           Sign in with Passkey
+        </Button>
+        <Button
+          onClick={async () => {
+            await authClient.signIn.social({ provider: "google" });
+          }}
+          variant="outline"
+          className="w-full"
+        >
+          <GoogleIcon className="size-5" />
+          Sign in with Google
         </Button>
       </CardContent>
       <CardFooter className="bg-muted/60 shadow-inset-lg flex items-center justify-end gap-2 border-t p-6 py-4 pt-4">

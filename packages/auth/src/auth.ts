@@ -65,6 +65,14 @@ export const config = {
           ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/api/auth/callback/github`
           : "http://localhost:3000/api/auth/callback/github",
     },
+    google: {
+      clientId: env.AUTH_GOOGLE_ID ?? "",
+      clientSecret: env.AUTH_GOOGLE_SECRET ?? "",
+      redirectURI:
+        env.NODE_ENV === "production"
+          ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}/api/auth/callback/google`
+          : "http://localhost:3000/api/auth/callback/google",
+    },
   },
   trustedOrigins: ["exp://", ...origins],
   advanced: {
