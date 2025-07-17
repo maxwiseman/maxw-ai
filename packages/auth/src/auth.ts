@@ -36,6 +36,12 @@ export const config = {
       },
     },
   },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google", "github"],
+    },
+  },
   secret: env.AUTH_SECRET,
   plugins: [
     oAuthProxy(),
