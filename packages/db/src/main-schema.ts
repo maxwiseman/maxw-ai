@@ -21,7 +21,7 @@ export const chat = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
     name: text("name", { length: 256 }).notNull(),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -58,7 +58,7 @@ export const message = sqliteTable(
     role: text("role", { mode: "json" }).$type<UIMessage["role"]>().notNull(),
     chatId: text("chat_id")
       .notNull()
-      .references(() => chat.id),
+      .references(() => chat.id, { onDelete: "cascade" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -87,10 +87,10 @@ export const chatShare = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
     chatId: text("chat_id")
       .notNull()
-      .references(() => chat.id),
+      .references(() => chat.id, { onDelete: "cascade" }),
   },
   (table) => [
     uniqueIndex("chat_share_chat_id_unique").on(table.chatId),

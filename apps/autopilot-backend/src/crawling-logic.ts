@@ -632,10 +632,12 @@ class InteractiveQuestionProcessor {
     // Calculate required wait time based on word count and timePerWord config
     const wordCount = countWords(questionText);
     const timePerWord = this.config?.timePerWord ?? 1;
-    const requiredWaitTimeMs = wordCount * timePerWord * 1000; // Convert to milliseconds
+    const randomMultiplier = 1 - (Math.random() - 0.5) / 2;
+    const requiredWaitTimeMs =
+      wordCount * timePerWord * 1000 * randomMultiplier; // Convert to milliseconds
 
     console.log(
-      `Interactive question activity: ${wordCount} words × ${timePerWord}s = ${requiredWaitTimeMs}ms wait time`,
+      `Interactive question activity: ${wordCount} words × ${timePerWord}s × ${randomMultiplier} = ${requiredWaitTimeMs}ms wait time`,
     );
 
     // Handle case with no inputs
@@ -700,10 +702,12 @@ class InteractiveQuestionProcessor {
     // Calculate required wait time based on word count and timePerWord config
     const wordCount = countWords(questionText);
     const timePerWord = this.config?.timePerWord ?? 1;
-    const requiredWaitTimeMs = wordCount * timePerWord * 1000; // Convert to milliseconds
+    const randomMultiplier = 1 - (Math.random() - 0.5) / 2;
+    const requiredWaitTimeMs =
+      wordCount * timePerWord * 1000 * randomMultiplier; // Convert to milliseconds with random jitter
 
     console.log(
-      `Drag and drop activity: ${wordCount} words × ${timePerWord}s = ${requiredWaitTimeMs}ms wait time`,
+      `Drag and drop activity: ${wordCount} words × ${timePerWord}s × ${randomMultiplier} = ${requiredWaitTimeMs}ms wait time`,
     );
 
     // Get drag drop column elements and their text content

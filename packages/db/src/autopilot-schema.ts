@@ -1,6 +1,5 @@
 import { relations } from "drizzle-orm";
 import {
-  integer,
   real,
   sqliteTableCreator,
   text,
@@ -16,7 +15,7 @@ export const invite = sqliteTable(
   "invite",
   {
     createdBy: text("created_by")
-      .references(() => user.id)
+      .references(() => user.id, { onDelete: "cascade" })
       .$defaultFn(() => crypto.randomUUID().slice(0, 6))
       .primaryKey(),
     code: text("code"),
@@ -33,7 +32,7 @@ export const invitesRelations = relations(invite, ({ one }) => ({
 export const configuration = sqliteTable("configuration", {
   userId: text("user_id")
     .primaryKey()
-    .references(() => user.id),
+    .references(() => user.id, { onDelete: "cascade" }),
   serviceCredentials: encryptedJSON()("service_credentials", {
     mode: "json",
   }).$type<{
