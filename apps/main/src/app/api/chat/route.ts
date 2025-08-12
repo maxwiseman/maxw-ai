@@ -20,7 +20,7 @@ import { getProvider } from "~/lib/provider-utils";
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
+  if (!session?.user.invitedTo.includes("main")) {
     return new Response("Unauthorized", { status: 401 });
   }
 

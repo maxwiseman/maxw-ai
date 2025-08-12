@@ -26,7 +26,7 @@ export const config = {
       invitedTo: {
         type: "string[]",
         // required: false,
-        defaultValue: ["main"],
+        defaultValue: [],
         input: false,
       },
       invitesRemaining: {
