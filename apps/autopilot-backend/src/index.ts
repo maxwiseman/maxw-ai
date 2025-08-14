@@ -127,6 +127,12 @@ class TaskManager {
     }
   >();
 
+  // Store active websocket connections for dynamic message sending
+  private activeConnections = new Map<
+    string,
+    { ws: ServerWebSocket<WSData>; userId: string }
+  >();
+
   // Thread-safe get operation
   get(userId: string) {
     return this.tasks.get(userId);
@@ -137,7 +143,7 @@ class TaskManager {
     userId: string,
     updates: Partial<NonNullable<ReturnType<typeof this.get>>>,
   ) {
-    const existing = this.tasks.get(userId) || {};
+    const existing = this.tasks.get(userId) ?? {};
     this.tasks.set(userId, { ...existing, ...updates });
   }
 
@@ -158,34 +164,76 @@ class TaskManager {
       this.hasActiveTask(userId),
     );
   }
+
+  // Add active websocket connection
+  addConnection(userId: string, ws: ServerWebSocket<WSData>) {
+    this.activeConnections.set(userId, { ws, userId });
+  }
+
+  // Remove active websocket connection
+  removeConnection(userId: string) {
+    this.activeConnections.delete(userId);
+  }
+
+  // Get current websocket connection for a user
+  getConnection(userId: string) {
+    return this.activeConnections.get(userId);
+  }
+
+  // Send message to current websocket connection for a user
+  sendMessageToUser(
+    userId: string,
+    data: z.infer<typeof WSServerMessageSchema>,
+  ) {
+    const connection = this.getConnection(userId);
+    if (connection) {
+      try {
+        connection.ws.send(JSON.stringify(data));
+      } catch (error) {
+        console.error("Failed to send message to user:", userId, error);
+        // Remove the connection if it's no longer valid
+        this.removeConnection(userId);
+      }
+    } else {
+      console.log(
+        "No active connection for user:",
+        userId,
+        "Message type:",
+        data.type,
+      );
+    }
+  }
 }
 
 const taskManager = new TaskManager();
 
-// Store active websocket connections for heartbeat
-const activeConnections = new Map<
-  string,
-  { ws: ServerWebSocket<WSData>; userId: string }
->();
+// Note: activeConnections are now managed by taskManager
 
 // Heartbeat interval to keep websocket connections alive
 const heartbeatInterval = setInterval(() => {
-  activeConnections.forEach(({ ws }, connectionId) => {
-    try {
-      // Send a simple ping message to keep the connection alive
-      ws.send(JSON.stringify({ type: "ping", timestamp: Date.now() }));
-    } catch {
-      console.log(
-        `Failed to send heartbeat to connection ${connectionId}, removing from active connections`,
-      );
-      activeConnections.delete(connectionId);
+  // Get all active connections from task manager
+  const activeUserIds = taskManager.getActiveUserIds();
+
+  activeUserIds.forEach((userId) => {
+    const connection = taskManager.getConnection(userId);
+    if (connection) {
+      try {
+        // Send a simple ping message to keep the connection alive
+        connection.ws.send(
+          JSON.stringify({ type: "ping", timestamp: Date.now() }),
+        );
+      } catch {
+        console.log(
+          `Failed to send heartbeat to user ${userId}, removing connection`,
+        );
+        taskManager.removeConnection(userId);
+      }
     }
   });
 
   // Log active users periodically
-  const activeUsers = taskManager.getActiveUserIds();
-  if (activeUsers.length > 0) {
-    console.log("Active users:", activeUsers);
+  if (activeUserIds.length > 0) {
+    console.log("Active users:", activeUserIds);
   }
 }, 30000); // 30 seconds
 
@@ -291,8 +339,13 @@ serve<WSData, {}>({
       const data = ws.data;
       const prevTask = taskManager.get(data.auth.user.id);
 
+      // Add this connection to the task manager
+      taskManager.addConnection(data.auth.user.id, ws);
+
+      // Create a sendMessage function that uses the current connection
+      const userId = data.auth.user.id;
       function sendMessage(data: z.infer<typeof WSServerMessageSchema>) {
-        ws.send(JSON.stringify(data));
+        taskManager.sendMessageToUser(userId, data);
       }
 
       taskManager.set(data.auth.user.id, { sendMessage });
@@ -310,11 +363,10 @@ serve<WSData, {}>({
         sendMessage({ type: "statusList", statuses: userStatuses });
       }
 
-      // Add to active connections
-      activeConnections.set(data.auth.user.id, {
-        ws,
-        userId: data.auth.user.id,
-      });
+      console.log(
+        "New websocket connection established for user:",
+        data.auth.user.id,
+      );
     },
     close(ws) {
       const prevTask = taskManager.get(ws.data.auth.user.id);
@@ -323,11 +375,17 @@ serve<WSData, {}>({
       taskManager.set(ws.data.auth.user.id, { sendMessage: undefined });
 
       // Remove from active connections
-      activeConnections.delete(ws.data.auth.user.id);
+      taskManager.removeConnection(ws.data.auth.user.id);
+
+      console.log(
+        "Websocket connection closed for user:",
+        ws.data.auth.user.id,
+      );
     },
     async message(ws, msg) {
+      const userId = ws.data.auth.user.id;
       function sendMessage(data: z.infer<typeof WSServerMessageSchema>) {
-        ws.send(JSON.stringify(data));
+        taskManager.sendMessageToUser(userId, data);
       }
 
       const prevTask = taskManager.get(ws.data.auth.user.id);
