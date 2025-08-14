@@ -1,5 +1,6 @@
 import type { UIDataTypes, UIMessage } from "ai";
 import { headers } from "next/headers";
+import { NextResponse } from "next/server";
 import { gateway } from "@ai-sdk/gateway";
 import {
   convertToModelMessages,
@@ -9,6 +10,7 @@ import {
   smoothStream,
   streamText,
 } from "ai";
+import { checkBotId } from "botid/server";
 
 import { auth } from "@acme/auth";
 import { buildConflictUpdateColumns, eq } from "@acme/db";
@@ -19,6 +21,12 @@ import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
 import { getProvider } from "~/lib/provider-utils";
 
 export async function POST(req: Request) {
+  const verification = await checkBotId();
+
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user.invitedTo.includes("main")) {
     return new Response("Unauthorized", { status: 401 });

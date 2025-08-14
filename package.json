@@ -40,5 +40,8 @@
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },
-  "prettier": "@acme/prettier-config"
+  "prettier": "@acme/prettier-config",
+  "dependencies": {
+    "botid": "^1.5.2"
+  }
 }
