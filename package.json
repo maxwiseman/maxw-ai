@@ -1,16 +1,20 @@
 {
   "name": "maxw-ai",
-  "private": true,
+  "devDependencies": {
+    "@acme/prettier-config": "workspace:*",
+    "@turbo/gen": "^2.5.4",
+    "@types/eslint__js": "^9.14.0",
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
   "engines": {
     "node": ">=20.16.0",
     "bun": "^1.2.8"
   },
   "packageManager": "bun@1.2.15",
-  "workspaces": [
-    "apps/*",
-    "packages/*",
-    "tooling/*"
-  ],
+  "prettier": "@acme/prettier-config",
+  "private": true,
   "scripts": {
     "build": "turbo run build",
     "build:main": "turbo run build -F @acme/main...",
@@ -32,16 +36,9 @@
     "postinstall": "bun run lint:ws",
     "ui-add": "turbo run ui-add"
   },
-  "devDependencies": {
-    "@acme/prettier-config": "workspace:*",
-    "@turbo/gen": "^2.5.4",
-    "@types/eslint__js": "^9.14.0",
-    "prettier": "^3.5.3",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
-  },
-  "prettier": "@acme/prettier-config",
-  "dependencies": {
-    "botid": "^1.5.2"
-  }
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tooling/*"
+  ]
 }

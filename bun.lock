@@ -3,9 +3,6 @@
   "workspaces": {
     "": {
       "name": "maxw-ai",
-      "dependencies": {
-        "botid": "^1.5.2",
-      },
       "devDependencies": {
         "@acme/prettier-config": "workspace:*",
         "@turbo/gen": "^2.5.4",
@@ -126,6 +123,7 @@
         "@vercel/analytics": "^1.5.0",
         "@vercel/functions": "^2.1.0",
         "ai": "5.0.0-beta.1",
+        "botid": "^1.5.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "geist": "^1.4.2",
