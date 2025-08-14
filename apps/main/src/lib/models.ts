@@ -202,6 +202,14 @@ export const models = defineModels({
     url: "https://platform.openai.com/docs/models/o4-mini",
     features: [modelFeatures.thinkSelectRequired],
   },
+  "gpt-oss": {
+    name: "GPT-OSS",
+    description:
+      "GPT-OSS is a model that is trained on the Open Source Software (OSS) dataset. It is a general-purpose model that can be used for a variety of tasks.",
+    brand: modelBrands.openai,
+    url: "https://platform.openai.com/docs/models/gpt-oss",
+    features: [modelFeatures.thinkRequired],
+  },
   sonar: {
     name: "Sonar",
     description:

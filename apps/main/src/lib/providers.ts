@@ -144,6 +144,10 @@ export const modelProviders = defineProviders({
       },
     }),
   },
+  "gpt-oss": {
+    groq: groq("openai/gpt-oss"),
+    gateway: gateway("openai/gpt-oss-120b"),
+  },
   sonar: {
     perplexity: perplexity("sonar"),
     gateway: gateway("perplexity/sonar"),
