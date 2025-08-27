@@ -21,11 +21,11 @@ import type { ModelFeatureResponse, ModelId } from "~/lib/model-utils";
 import { getProvider } from "~/lib/provider-utils";
 
 export async function POST(req: Request) {
-  const verification = await checkBotId();
+  // const verification = await checkBotId();
 
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  // if (verification.isBot) {
+  //   return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  // }
 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user.invitedTo.includes("main")) {

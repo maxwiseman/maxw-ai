@@ -5,16 +5,10 @@ initBotId({
     {
       path: "/api/*",
       method: "GET",
-      advancedOptions: {
-        checkLevel: "basic",
-      },
     },
     {
       path: "/api/*",
       method: "POST",
-      advancedOptions: {
-        checkLevel: "basic",
-      },
     },
   ],
 });
