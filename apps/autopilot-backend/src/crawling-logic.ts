@@ -1183,7 +1183,7 @@ class InteractiveQuestionProcessor {
 
     // Generate AI response
     const answer = await generateObject({
-      model: openai("o4-mini"),
+      model: openai("gpt-5.2"),
       providerOptions: {
         openai: {
           reasoningEffort: "low",
