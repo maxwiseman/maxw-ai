@@ -476,7 +476,7 @@ class EducationalPlatformAutomation {
     const systemPrompt = this.createWorksheetSystemPrompt();
 
     const output = await generateText({
-      model: openai.responses("o4-mini"),
+      model: openai.responses("gpt-5-mini"),
       messages: [
         {
           role: "system",
@@ -779,7 +779,7 @@ class InteractiveQuestionProcessor {
     });
 
     const responses = await generateObject({
-      model: openai("o4-mini"),
+      model: openai("gpt-5-mini"),
       schema: dragDropSchema,
       messages: [
         {
@@ -1183,7 +1183,7 @@ class InteractiveQuestionProcessor {
 
     // Generate AI response
     const answer = await generateObject({
-      model: openai("o4-mini"),
+      model: openai("gpt-5-mini"),
       providerOptions: {
         openai: {
           reasoningEffort: "low",
