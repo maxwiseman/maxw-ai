@@ -81,16 +81,6 @@ export function Configuration() {
             />
           </div>
           <div className="flex w-full items-center justify-between text-sm font-medium">
-            Complete PDF assignments
-            <Switch
-              checked={config.completePdfAssignments}
-              onCheckedChange={(completePdfAssignments) =>
-                config.setConfiguration({ completePdfAssignments })
-              }
-              className="data-[state=unchecked]:bg-card outline-border data-[state=unchecked]:[&>*]:bg-border outline-1 [&>*]:transition-all"
-            />
-          </div>
-          <div className="flex w-full items-center justify-between text-sm font-medium">
             Allow external research
             <Switch
               checked={config.allowExternalResearch}

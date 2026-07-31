@@ -11,7 +11,6 @@ import { getConfiguration, updateConfiguration } from "./actions";
 export interface configurationStore {
   serviceCredentials: { username: string; password: string };
   completeQuizzes: boolean;
-  completePdfAssignments: boolean;
   allowExternalResearch: boolean;
   customInstructions: string;
   setConfiguration: (newConfig: Partial<configurationStore>) => void;
@@ -22,17 +21,17 @@ const useConfigurationStore = create<configurationStore>()(
     (set) => ({
       serviceCredentials: { username: "", password: "" },
       completeQuizzes: false,
-      completePdfAssignments: false,
       allowExternalResearch: true,
       customInstructions: "",
       setConfiguration: (newConfig) => set(newConfig),
     }),
     {
       name: "configuration-storage",
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const migrated = { ...(persistedState as object) };
         Reflect.deleteProperty(migrated, "timePerWord");
+        Reflect.deleteProperty(migrated, "completePdfAssignments");
         return migrated as configurationStore;
       },
     },

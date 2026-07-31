@@ -67,7 +67,6 @@ export async function getConfiguration() {
   if (!query) return query;
   return {
     allowExternalResearch: query.allowExternalResearch,
-    completePdfAssignments: query.completePdfAssignments,
     completeQuizzes: query.completeQuizzes,
     customInstructions: query.customInstructions,
     serviceCredentials: query.serviceCredentials,
@@ -79,7 +78,6 @@ export async function updateConfiguration(config: {
   username: string;
   password: string;
   completeQuizzes: boolean;
-  completePdfAssignments: boolean;
   allowExternalResearch: boolean;
   customInstructions: string;
 }) {
@@ -95,7 +93,6 @@ export async function updateConfiguration(config: {
         password: config.password,
       },
       completeQuizzes: config.completeQuizzes,
-      completePdfAssignments: config.completePdfAssignments,
       allowExternalResearch: config.allowExternalResearch,
       customInstructions: config.customInstructions.slice(0, 4_000),
     })
@@ -107,7 +104,6 @@ export async function updateConfiguration(config: {
           password: config.password,
         },
         completeQuizzes: config.completeQuizzes,
-        completePdfAssignments: config.completePdfAssignments,
         allowExternalResearch: config.allowExternalResearch,
         customInstructions: config.customInstructions.slice(0, 4_000),
       },
