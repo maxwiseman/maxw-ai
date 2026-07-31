@@ -64,13 +64,20 @@ export async function getConfiguration() {
   const query = await db.query.configuration.findFirst({
     where: eq(configuration.userId, authData.user.id),
   });
-  return query;
+  if (!query) return query;
+  return {
+    allowExternalResearch: query.allowExternalResearch,
+    completePdfAssignments: query.completePdfAssignments,
+    completeQuizzes: query.completeQuizzes,
+    customInstructions: query.customInstructions,
+    serviceCredentials: query.serviceCredentials,
+    userId: query.userId,
+  };
 }
 
 export async function updateConfiguration(config: {
   username: string;
   password: string;
-  timePerWord: number;
   completeQuizzes: boolean;
   completePdfAssignments: boolean;
   allowExternalResearch: boolean;
@@ -87,7 +94,6 @@ export async function updateConfiguration(config: {
         username: config.username,
         password: config.password,
       },
-      timePerWord: config.timePerWord,
       completeQuizzes: config.completeQuizzes,
       completePdfAssignments: config.completePdfAssignments,
       allowExternalResearch: config.allowExternalResearch,
@@ -100,7 +106,6 @@ export async function updateConfiguration(config: {
           username: config.username,
           password: config.password,
         },
-        timePerWord: config.timePerWord,
         completeQuizzes: config.completeQuizzes,
         completePdfAssignments: config.completePdfAssignments,
         allowExternalResearch: config.allowExternalResearch,

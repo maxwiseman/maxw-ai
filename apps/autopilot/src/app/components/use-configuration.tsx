@@ -10,7 +10,6 @@ import { getConfiguration, updateConfiguration } from "./actions";
 
 export interface configurationStore {
   serviceCredentials: { username: string; password: string };
-  timePerWord: number;
   completeQuizzes: boolean;
   completePdfAssignments: boolean;
   allowExternalResearch: boolean;
@@ -22,14 +21,21 @@ const useConfigurationStore = create<configurationStore>()(
   persist(
     (set) => ({
       serviceCredentials: { username: "", password: "" },
-      timePerWord: 0.1,
       completeQuizzes: false,
       completePdfAssignments: false,
       allowExternalResearch: true,
       customInstructions: "",
       setConfiguration: (newConfig) => set(newConfig),
     }),
-    { name: "configuration-storage" },
+    {
+      name: "configuration-storage",
+      version: 2,
+      migrate: (persistedState) => {
+        const migrated = { ...(persistedState as object) };
+        Reflect.deleteProperty(migrated, "timePerWord");
+        return migrated as configurationStore;
+      },
+    },
   ),
 );
 

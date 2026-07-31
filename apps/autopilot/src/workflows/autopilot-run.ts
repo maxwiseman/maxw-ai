@@ -1,8 +1,16 @@
+import { eq } from "drizzle-orm";
 import { defineHook, sleep } from "workflow";
 import { z } from "zod";
 
+import { db } from "@acme/db/client";
+import { autopilotRun } from "@acme/db/schema";
+
 import type { AutopilotRunInput } from "~/server/autopilot-run";
-import { env } from "~/env";
+import {
+  provisionAutopilotSandbox,
+  stopAutopilotSandbox,
+} from "~/server/autopilot-sandbox";
+import { sendAutopilotNotification } from "~/server/push-notifications";
 
 type RunStopReason =
   | "completed"
@@ -11,30 +19,6 @@ type RunStopReason =
   | "timeout"
   | "worker_lost";
 
-async function callControlPlane(
-  input: AutopilotRunInput,
-  path: string,
-  body: object,
-): Promise<{ body: string; ok: boolean; status: number }> {
-  "use step";
-
-  const secret = env.AUTOPILOT_WORKER_SECRET;
-  if (!secret) throw new Error("AUTOPILOT_WORKER_SECRET must be configured");
-  const response = await fetch(`${input.controlUrl}${path}`, {
-    body: JSON.stringify(body),
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-  });
-  return {
-    body: await response.text(),
-    ok: response.ok,
-    status: response.status,
-  };
-}
-
 async function callSandboxController(
   input: AutopilotRunInput,
   action: "provision" | "stop",
@@ -42,22 +26,8 @@ async function callSandboxController(
 ): Promise<void> {
   "use step";
 
-  const secret = env.AUTOPILOT_WORKER_SECRET;
-  if (!secret) throw new Error("AUTOPILOT_WORKER_SECRET must be configured");
-
-  const response = await fetch(`${input.controlUrl}/api/autopilot/sandbox`, {
-    body: JSON.stringify({ action, finalStatus, input }),
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Sandbox controller ${action} failed: ${response.status} ${await response.text()}`,
-    );
-  }
+  if (action === "provision") await provisionAutopilotSandbox(input);
+  else await stopAutopilotSandbox(input, finalStatus);
 }
 
 export const autopilotCompletionHook = defineHook({
@@ -75,30 +45,56 @@ async function waitForHeartbeatFailure(
 ): Promise<{ reason: "worker_lost" }> {
   while (true) {
     await sleep("5m");
-    const response = await callControlPlane(
-      input,
-      "/api/autopilot/run/health",
-      { runId: input.runId },
-    );
-    if (!response.ok) {
-      throw new Error(`Heartbeat check failed: ${response.status}`);
-    }
-    const result = JSON.parse(response.body) as { alive: boolean };
-    if (!result.alive) return { reason: "worker_lost" };
+    if (!(await isWorkerAlive(input.runId))) return { reason: "worker_lost" };
   }
+}
+
+async function isWorkerAlive(runId: string): Promise<boolean> {
+  "use step";
+
+  const run = await db.query.autopilotRun.findFirst({
+    where: eq(autopilotRun.id, runId),
+  });
+  return !!(
+    run?.lastHeartbeatAt &&
+    ["provisioning", "ready"].includes(run.status) &&
+    Date.now() - run.lastHeartbeatAt.getTime() < 2 * 60 * 1_000
+  );
 }
 
 async function recordStopAndNotify(
   input: AutopilotRunInput,
   reason: RunStopReason,
 ): Promise<void> {
-  const response = await callControlPlane(input, "/api/autopilot/notify", {
-    reason,
-    runId: input.runId,
+  "use step";
+
+  const run = await db.query.autopilotRun.findFirst({
+    where: eq(autopilotRun.id, input.runId),
   });
-  if (!response.ok) {
-    throw new Error(`Stop notification failed: ${response.status}`);
+  if (!run) return;
+  if (!run.notificationSentAt && reason !== "manual") {
+    const messages: Record<Exclude<RunStopReason, "manual">, string> = {
+      completed: "Autopilot finished its run.",
+      error: "Autopilot stopped because it encountered an error.",
+      timeout: "Autopilot reached its maximum run time and stopped.",
+      worker_lost:
+        "Autopilot lost contact with its browser worker and stopped.",
+    };
+    await sendAutopilotNotification(run.userId, {
+      body: messages[reason],
+      tag: `autopilot-stopped-${run.id}`,
+      title: "Autopilot stopped",
+      url: "/",
+    });
   }
+  await db
+    .update(autopilotRun)
+    .set({
+      notificationSentAt:
+        reason === "manual" ? run.notificationSentAt : new Date(),
+      stopReason: reason,
+    })
+    .where(eq(autopilotRun.id, run.id));
 }
 
 export async function manageAutopilotRun(input: AutopilotRunInput) {

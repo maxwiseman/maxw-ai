@@ -9,7 +9,11 @@ import { env } from "~/env";
 import { requiredWorkerSecret } from "~/server/autopilot-run";
 
 const SANDBOX_PORT = 8080;
-const SANDBOX_TIMEOUT_MS = 23 * 60 * 60 * 1000 + 55 * 60 * 1000;
+const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
+// Hobby projects allow Sandbox sessions up to 45 minutes. Use a small margin
+// so this deployment works on every Vercel plan; named Sandbox persistence
+// still preserves the filesystem between sessions.
+const SANDBOX_TIMEOUT_MS = 44 * 60 * 1000;
 const SNAPSHOT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CHROMIUM_SYSTEM_DEPS = [
@@ -141,8 +145,15 @@ async function startWorker(sandbox: Sandbox): Promise<string> {
   const workerUrl = sandbox.domain(SANDBOX_PORT);
   if (!(await isWorkerHealthy(workerUrl))) {
     await sandbox.runCommand({
-      args: ["--filter", "@acme/autopilot-backend", "start"],
-      cmd: "bun",
+      args: ["-p", "/vercel/sandbox/.autopilot"],
+      cmd: "mkdir",
+    });
+    await sandbox.runCommand({
+      args: [
+        "-lc",
+        `exec bun --filter @acme/autopilot-backend start > ${WORKER_LOG_PATH} 2>&1`,
+      ],
+      cmd: "sh",
       cwd: "/vercel/sandbox",
       detached: true,
     });
@@ -195,6 +206,7 @@ export async function stopAutopilotSandbox(
   finalStatus: "error" | "stopped" = "stopped",
 ): Promise<void> {
   const { Sandbox } = await import("@vercel/sandbox");
+  let workerError: string | undefined;
   await db
     .update(autopilotRun)
     .set({ status: "stopping" })
@@ -206,13 +218,27 @@ export async function stopAutopilotSandbox(
       name: input.sandboxName,
       resume: false,
     });
+    if (finalStatus === "error") {
+      const logs = await sandbox.runCommand({
+        args: ["-n", "60", WORKER_LOG_PATH],
+        cmd: "tail",
+      });
+      if (logs.exitCode === 0) {
+        const output = (await logs.stdout()).trim();
+        if (output) workerError = output.slice(-2_000);
+      }
+    }
     if (sandbox.status !== "stopped") await sandbox.stop();
   } catch (error) {
     console.warn("Sandbox was already unavailable during cleanup", error);
   } finally {
     await db
       .update(autopilotRun)
-      .set({ status: finalStatus, workerUrl: null })
+      .set({
+        ...(workerError ? { lastError: workerError } : {}),
+        status: finalStatus,
+        workerUrl: null,
+      })
       .where(eq(autopilotRun.id, input.runId));
   }
 }

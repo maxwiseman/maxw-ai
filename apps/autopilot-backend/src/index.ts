@@ -80,6 +80,7 @@ await cluster.task((async ({ page, data }) => {
 
   await page.setViewport({ height: 800, width: 1400 });
   let stopReason: "completed" | "error" | "manual" = "completed";
+  let stopError: string | undefined;
 
   try {
     console.log("Starting crawling process for user:", data.userId);
@@ -102,6 +103,7 @@ await cluster.task((async ({ page, data }) => {
     console.log("Crawling completed successfully for user:", data.userId);
   } catch (error) {
     stopReason = abortController.signal.aborted ? "manual" : "error";
+    stopError = error instanceof Error ? error.message : String(error);
     console.error("Crawling failed for user:", data.userId, error);
     data.sendMessage({ type: "newState", state: { status: "stopped" } });
   } finally {
@@ -116,6 +118,7 @@ await cluster.task((async ({ page, data }) => {
       completionDelivered = await notifyControlPlane(data.userId, {
         type: "stopped",
         reason: stopReason,
+        error: stopError,
       });
       if (!completionDelivered) await sleep(2 ** attempt * 1_000);
     }

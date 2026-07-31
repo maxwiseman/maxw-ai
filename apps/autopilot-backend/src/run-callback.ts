@@ -3,7 +3,11 @@ import { createWorkerToken } from "./worker-token";
 export type WorkerEvent =
   | { type: "heartbeat" }
   | { type: "input_required"; question: string }
-  | { type: "stopped"; reason: "completed" | "error" | "manual" };
+  | {
+      type: "stopped";
+      reason: "completed" | "error" | "manual";
+      error?: string;
+    };
 
 export async function notifyControlPlane(
   userId: string,

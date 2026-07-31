@@ -18,6 +18,7 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("stopped"),
     reason: z.enum(["completed", "error", "manual"]),
+    error: z.string().max(2_000).optional(),
   }),
 ]);
 
@@ -63,7 +64,14 @@ export async function POST(request: Request) {
 
   await db
     .update(autopilotRun)
-    .set({ status: "stopping", stopReason: event.data.reason })
+    .set({
+      lastError:
+        event.data.reason === "error"
+          ? (event.data.error ?? "Autopilot worker stopped unexpectedly")
+          : null,
+      status: "stopping",
+      stopReason: event.data.reason,
+    })
     .where(eq(autopilotRun.id, run.id));
   await autopilotCompletionHook.resume(`autopilot-run:${run.id}`, {
     reason: event.data.reason,

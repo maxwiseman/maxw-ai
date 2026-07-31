@@ -12,12 +12,12 @@ const appDirectory = dirname(fileURLToPath(import.meta.url));
 const config = {
   reactStrictMode: true,
 
-  // Keep the Sandbox SDK in the Node runtime. The alias works around
-  // xdg-app-paths reading an undefined webpack entry filename while Next
-  // collects Workflow route data.
+  // Work around xdg-app-paths reading an undefined webpack entry filename
+  // while Next collects Workflow route data. Let Next bundle the Sandbox SDK
+  // so it uses the SDK's ESM entry; externalizing it selects the CommonJS entry,
+  // which cannot require the ESM-only @workflow/serde dependency.
   webpack(webpackConfig, { isServer }) {
     if (isServer) {
-      webpackConfig.externals.push("@vercel/sandbox");
       webpackConfig.resolve.alias["xdg-app-paths"] = resolve(
         appDirectory,
         "src/server/xdg-app-paths.cjs",
