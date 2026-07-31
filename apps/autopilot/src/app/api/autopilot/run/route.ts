@@ -81,6 +81,9 @@ export async function POST() {
         lastError: null,
         sandboxName: input.sandboxName,
         status: "provisioning",
+        lastHeartbeatAt: null,
+        notificationSentAt: null,
+        stopReason: null,
         workerUrl: null,
         workflowRunId: null,
       },
@@ -120,12 +123,12 @@ export async function DELETE() {
 
   await db
     .update(autopilotRun)
-    .set({ status: "stopping" })
+    .set({ status: "stopping", stopReason: "manual" })
     .where(eq(autopilotRun.id, run.id));
   await import("~/workflows/autopilot-run").then(
     ({ autopilotCompletionHook }) =>
       autopilotCompletionHook.resume(`autopilot-run:${run.id}`, {
-        reason: "stopped",
+        reason: "manual",
       }),
   );
   return new Response(null, { status: 202 });

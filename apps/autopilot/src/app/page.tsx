@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@acme/auth";
 
+import { AgentInputDialog } from "./components/agent-input-dialog";
 import { InfoPane } from "./components/info-pane";
 import { Navbar } from "./components/navbar";
 import { NotInvited } from "./components/not-invited";
@@ -14,6 +15,7 @@ export default async function Page() {
 
   return (
     <WebSocketProvider>
+      <AgentInputDialog />
       {!session.user.invitedTo.includes("autopilot") ? (
         <NotInvited />
       ) : (

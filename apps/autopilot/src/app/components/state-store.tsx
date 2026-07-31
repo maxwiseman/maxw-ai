@@ -25,11 +25,18 @@ export interface StatusUpdate {
   timestamp: number;
 }
 
+export interface AgentInputRequest {
+  id: string;
+  options?: string[];
+  question: string;
+}
+
 interface AutopilotState {
   status: "running" | "stopped";
   wsStatus: "connected" | "connecting" | "disconnected" | "disconnecting";
   isProvisioning: boolean;
   previewUrl: string | null;
+  inputRequest: AgentInputRequest | null;
   updates: string[];
   statuses: StatusUpdate[];
   updateState: (newState: Partial<AutopilotState>) => void;
@@ -44,6 +51,7 @@ export const useStateStore = create<AutopilotState>()((set) => ({
   wsStatus: "disconnected",
   isProvisioning: true,
   previewUrl: null,
+  inputRequest: null,
   updates: [],
   statuses: [],
   updateState: (newState) => {
@@ -52,6 +60,7 @@ export const useStateStore = create<AutopilotState>()((set) => ({
 
       // If status is being set to stopped, mark all pending statuses as error
       if (newState.status === "stopped") {
+        updatedState.inputRequest = null;
         updatedState.statuses = state.statuses.map((status) =>
           status.type === "pending"
             ? {
@@ -266,12 +275,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         ) {
           useStateStore.getState().clearStatuses();
         }
-        if (
-          previousStatus === "running" &&
-          parsedMessage.state.status === "stopped"
-        ) {
-          void endRun();
-        }
       } else if (parsedMessage.type === "statusUpdate") {
         // Check if this status already exists (update) or is new (add)
         const existingStatus = useStateStore
@@ -284,6 +287,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
       } else if (parsedMessage.type === "statusList") {
         useStateStore.getState().setStatuses(parsedMessage.statuses);
+      } else if (parsedMessage.type === "inputRequest") {
+        useStateStore.getState().updateState({
+          inputRequest: parsedMessage.request,
+        });
       }
     } catch (error) {
       console.warn("Failed to parse websocket message:", error);
@@ -310,6 +317,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         return;
       }
       ws.sendJsonMessage(data);
+      if (data.type === "stop") void endRun();
     },
   };
 

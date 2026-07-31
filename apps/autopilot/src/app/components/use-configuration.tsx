@@ -11,6 +11,10 @@ import { getConfiguration, updateConfiguration } from "./actions";
 export interface configurationStore {
   serviceCredentials: { username: string; password: string };
   timePerWord: number;
+  completeQuizzes: boolean;
+  completePdfAssignments: boolean;
+  allowExternalResearch: boolean;
+  customInstructions: string;
   setConfiguration: (newConfig: Partial<configurationStore>) => void;
 }
 
@@ -19,6 +23,10 @@ const useConfigurationStore = create<configurationStore>()(
     (set) => ({
       serviceCredentials: { username: "", password: "" },
       timePerWord: 0.1,
+      completeQuizzes: false,
+      completePdfAssignments: false,
+      allowExternalResearch: true,
+      customInstructions: "",
       setConfiguration: (newConfig) => set(newConfig),
     }),
     { name: "configuration-storage" },

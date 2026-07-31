@@ -42,7 +42,31 @@ export const configuration = sqliteTable("configuration", {
     password: string;
   }>(),
   timePerWord: real("time_per_word").default(0.1),
+  completeQuizzes: integer("complete_quizzes", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  completePdfAssignments: integer("complete_pdf_assignments", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
+  allowExternalResearch: integer("allow_external_research", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(true),
+  customInstructions: text("custom_instructions").notNull().default(""),
+  agentContext: text("agent_context", { mode: "json" })
+    .$type<ActivityMemory[]>()
+    .notNull()
+    .default([]),
 });
+
+export interface ActivityMemory {
+  activity: string;
+  createdAt: string;
+  summary: string;
+}
 
 export const autopilotRunStatuses = [
   "provisioning",
@@ -53,6 +77,16 @@ export const autopilotRunStatuses = [
 ] as const;
 
 export type AutopilotRunStatus = (typeof autopilotRunStatuses)[number];
+
+export const autopilotRunStopReasons = [
+  "manual",
+  "completed",
+  "error",
+  "worker_lost",
+  "timeout",
+] as const;
+
+export type AutopilotRunStopReason = (typeof autopilotRunStopReasons)[number];
 
 export const autopilotRun = sqliteTable(
   "run",
@@ -68,6 +102,11 @@ export const autopilotRun = sqliteTable(
       .notNull()
       .default("provisioning"),
     lastError: text("last_error"),
+    lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp" }),
+    stopReason: text("stop_reason", { enum: autopilotRunStopReasons }),
+    notificationSentAt: integer("notification_sent_at", {
+      mode: "timestamp",
+    }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -82,9 +121,35 @@ export const autopilotRun = sqliteTable(
   ],
 );
 
+export const pushSubscription = sqliteTable(
+  "push_subscription",
+  {
+    endpoint: text("endpoint").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index("autopilot_push_subscription_user_index").on(table.userId)],
+);
+
 export const autopilotRunRelations = relations(autopilotRun, ({ one }) => ({
   user: one(user, {
     fields: [autopilotRun.userId],
     references: [user.id],
   }),
 }));
+
+export const pushSubscriptionRelations = relations(
+  pushSubscription,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [pushSubscription.userId],
+      references: [user.id],
+    }),
+  }),
+);

@@ -10,7 +10,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { WSServerMessageSchema } from "./message-schema";
 import { startCrawling } from "./crawling-logic";
 import { WSClientMessageSchema } from "./message-schema";
-import { notifyRunCompleted } from "./run-callback";
+import { notifyControlPlane, startHeartbeat } from "./run-callback";
 import {
   clearUserStatuses,
   getUserStatuses,
@@ -57,6 +57,10 @@ const cluster = await Cluster.launch({
 });
 
 console.log("Cluster launched successfully");
+const workerUserId = process.env.AUTOPILOT_USER_ID;
+const stopWorkerHeartbeat = workerUserId
+  ? startHeartbeat(workerUserId)
+  : () => undefined;
 await cluster.task((async ({ page, data }) => {
   // Use provided abortController or create a new one
   const abortController = data.abortController ?? new AbortController();
@@ -75,6 +79,7 @@ await cluster.task((async ({ page, data }) => {
   });
 
   await page.setViewport({ height: 800, width: 1400 });
+  let stopReason: "completed" | "error" | "manual" = "completed";
 
   try {
     console.log("Starting crawling process for user:", data.userId);
@@ -84,20 +89,43 @@ await cluster.task((async ({ page, data }) => {
         userId: data.userId,
         sendMessage: data.sendMessage,
         signal: abortController.signal,
+        requestInput: (question, choices) =>
+          taskManager.requestInput(
+            data.userId,
+            question,
+            choices,
+            abortController.signal,
+          ),
       }),
       abortPromise,
     ]);
     console.log("Crawling completed successfully for user:", data.userId);
   } catch (error) {
+    stopReason = abortController.signal.aborted ? "manual" : "error";
     console.error("Crawling failed for user:", data.userId, error);
     data.sendMessage({ type: "newState", state: { status: "stopped" } });
   } finally {
+    taskManager.cancelPendingInput(data.userId);
     // Mark all pending statuses as errors when automation stops
     markPendingStatusesAsError(data.userId, data.sendMessage);
 
     taskManager.delete(data.userId);
     data.sendMessage({ type: "newState", state: { status: "stopped" } });
-    await notifyRunCompleted(data.userId);
+    let completionDelivered = false;
+    for (let attempt = 0; attempt < 5 && !completionDelivered; attempt += 1) {
+      completionDelivered = await notifyControlPlane(data.userId, {
+        type: "stopped",
+        reason: stopReason,
+      });
+      if (!completionDelivered) await sleep(2 ** attempt * 1_000);
+    }
+    if (!completionDelivered && process.env.AUTOPILOT_RUN_CALLBACK_URL) {
+      console.error(
+        "Could not deliver the stop callback; ending the worker so Workflow detects the lost heartbeat",
+      );
+      stopWorkerHeartbeat();
+      setTimeout(() => process.exit(1), 0);
+    }
   }
 }) as TaskFunction<
   {
@@ -131,6 +159,15 @@ class TaskManager {
   private activeConnections = new Map<
     string,
     { ws: ServerWebSocket<WSData>; userId: string }
+  >();
+
+  private pendingInputs = new Map<
+    string,
+    {
+      request: { id: string; question: string; options?: string[] };
+      resolve: (answer: string) => void;
+      reject: (error: Error) => void;
+    }
   >();
 
   // Thread-safe get operation
@@ -178,6 +215,55 @@ class TaskManager {
   // Get current websocket connection for a user
   getConnection(userId: string) {
     return this.activeConnections.get(userId);
+  }
+
+  getPendingInput(userId: string) {
+    return this.pendingInputs.get(userId)?.request;
+  }
+
+  async requestInput(
+    userId: string,
+    question: string,
+    options: string[] | undefined,
+    signal: AbortSignal,
+  ): Promise<string> {
+    if (signal.aborted) throw new Error("Autopilot was stopped");
+    if (this.pendingInputs.has(userId)) {
+      throw new Error("Autopilot already has an unanswered user question");
+    }
+
+    const request = { id: crypto.randomUUID(), question, options };
+    const answer = new Promise<string>((resolve, reject) => {
+      this.pendingInputs.set(userId, { request, resolve, reject });
+      signal.addEventListener(
+        "abort",
+        () => {
+          this.cancelPendingInput(userId);
+        },
+        { once: true },
+      );
+    });
+    this.sendMessageToUser(userId, { type: "inputRequest", request });
+    void notifyControlPlane(userId, {
+      type: "input_required",
+      question,
+    });
+    return answer;
+  }
+
+  answerInput(userId: string, requestId: string, answer: string): boolean {
+    const pending = this.pendingInputs.get(userId);
+    if (!pending || pending.request.id !== requestId) return false;
+    this.pendingInputs.delete(userId);
+    pending.resolve(answer);
+    return true;
+  }
+
+  cancelPendingInput(userId: string): void {
+    const pending = this.pendingInputs.get(userId);
+    if (!pending) return;
+    this.pendingInputs.delete(userId);
+    pending.reject(new Error("Autopilot stopped while waiting for user input"));
   }
 
   // Send message to current websocket connection for a user
@@ -239,8 +325,13 @@ const heartbeatInterval = setInterval(() => {
 
 // Cleanup heartbeat interval on process exit
 process.on("SIGINT", () => {
+  stopWorkerHeartbeat();
   clearInterval(heartbeatInterval);
   process.exit(0);
+});
+process.on("SIGTERM", () => {
+  stopWorkerHeartbeat();
+  clearInterval(heartbeatInterval);
 });
 
 async function getRequestUserId(req: Request): Promise<string | null> {
@@ -385,6 +476,10 @@ serve<WSData, Record<never, never>>({
       if (userStatuses.length > 0) {
         sendMessage({ type: "statusList", statuses: userStatuses });
       }
+      const pendingInput = taskManager.getPendingInput(data.userId);
+      if (pendingInput) {
+        sendMessage({ type: "inputRequest", request: pendingInput });
+      }
 
       console.log(
         "New websocket connection established for user:",
@@ -413,6 +508,21 @@ serve<WSData, Record<never, never>>({
       const parsedMsg = WSClientMessageSchema.parse(
         await JSON.parse(msg as string),
       );
+      if (parsedMsg.type === "userInput") {
+        if (
+          !taskManager.answerInput(
+            userId,
+            parsedMsg.requestId,
+            parsedMsg.answer,
+          )
+        ) {
+          console.warn(
+            "Ignoring stale user input response",
+            parsedMsg.requestId,
+          );
+        }
+        return;
+      }
       if (parsedMsg.type === "start") {
         console.log("Starting crawling for user:", ws.data.userId);
 

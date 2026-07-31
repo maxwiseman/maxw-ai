@@ -32,7 +32,7 @@
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
-    "lint:ws": "bunx sherif@latest",
+    "lint:ws": "bunx sherif@latest -i ai -i @ai-sdk/gateway",
     "postinstall": "bun run lint:ws",
     "ui-add": "turbo run ui-add"
   },

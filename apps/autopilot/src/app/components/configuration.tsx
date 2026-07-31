@@ -10,11 +10,14 @@ import {
 import { Input } from "@acme/ui/input";
 import { Label } from "@acme/ui/label";
 import { Switch } from "@acme/ui/switch";
+import { Textarea } from "@acme/ui/textarea";
 
 import { useConfiguration } from "./use-configuration";
+import { useNotifications } from "./use-notifications";
 
 export function Configuration() {
   const config = useConfiguration();
+  const notifications = useNotifications();
 
   return (
     <>
@@ -84,17 +87,61 @@ export function Configuration() {
           <div className="flex w-full items-center justify-between text-sm font-medium">
             Complete quizzes
             <Switch
-              disabled
+              checked={config.completeQuizzes}
+              onCheckedChange={(completeQuizzes) =>
+                config.setConfiguration({ completeQuizzes })
+              }
               className="data-[state=unchecked]:bg-card outline-border data-[state=unchecked]:[&>*]:bg-border outline-1 [&>*]:transition-all"
             />
           </div>
           <div className="flex w-full items-center justify-between text-sm font-medium">
             Complete PDF assignments
             <Switch
-              disabled
+              checked={config.completePdfAssignments}
+              onCheckedChange={(completePdfAssignments) =>
+                config.setConfiguration({ completePdfAssignments })
+              }
               className="data-[state=unchecked]:bg-card outline-border data-[state=unchecked]:[&>*]:bg-border outline-1 [&>*]:transition-all"
             />
           </div>
+          <div className="flex w-full items-center justify-between text-sm font-medium">
+            Allow external research
+            <Switch
+              checked={config.allowExternalResearch}
+              onCheckedChange={(allowExternalResearch) =>
+                config.setConfiguration({ allowExternalResearch })
+              }
+              className="data-[state=unchecked]:bg-card outline-border data-[state=unchecked]:[&>*]:bg-border outline-1 [&>*]:transition-all"
+            />
+          </div>
+          <div className="flex w-full items-center justify-between text-sm font-medium">
+            Desktop notifications
+            <Switch
+              checked={notifications.enabled}
+              disabled={
+                notifications.loading ||
+                !notifications.supported ||
+                !notifications.configured
+              }
+              onCheckedChange={(enabled) =>
+                void notifications.setEnabled(enabled)
+              }
+              className="data-[state=unchecked]:bg-card outline-border data-[state=unchecked]:[&>*]:bg-border outline-1 [&>*]:transition-all"
+            />
+          </div>
+          <ConfigurationOption title="Custom agent instructions">
+            <Textarea
+              className="min-h-24 resize-y"
+              maxLength={4_000}
+              onChange={(event) =>
+                config.setConfiguration({
+                  customInstructions: event.target.value,
+                })
+              }
+              placeholder="For example: Prefer concise answers, never submit written responses without asking me first..."
+              value={config.customInstructions}
+            />
+          </ConfigurationOption>
         </CardContent>
       </Card>
     </>

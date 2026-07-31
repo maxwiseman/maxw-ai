@@ -4,6 +4,11 @@ export const WSClientMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.enum(["start", "stop"]),
   }),
+  z.object({
+    type: z.literal("userInput"),
+    requestId: z.string().min(1),
+    answer: z.string().min(1).max(10_000),
+  }),
 ]);
 
 export const StatusUpdateSchema = z.object({
@@ -29,5 +34,13 @@ export const WSServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("statusList"),
     statuses: z.array(StatusUpdateSchema),
+  }),
+  z.object({
+    type: z.literal("inputRequest"),
+    request: z.object({
+      id: z.string(),
+      question: z.string(),
+      options: z.array(z.string()).optional(),
+    }),
   }),
 ]);

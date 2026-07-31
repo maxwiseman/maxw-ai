@@ -71,6 +71,10 @@ export async function updateConfiguration(config: {
   username: string;
   password: string;
   timePerWord: number;
+  completeQuizzes: boolean;
+  completePdfAssignments: boolean;
+  allowExternalResearch: boolean;
+  customInstructions: string;
 }) {
   const authData = await auth.api.getSession({ headers: await headers() });
   if (!authData?.user) return "Unauthorized";
@@ -79,13 +83,28 @@ export async function updateConfiguration(config: {
     .insert(configuration)
     .values({
       userId: authData.user.id,
-      serviceCredentials: config,
+      serviceCredentials: {
+        username: config.username,
+        password: config.password,
+      },
+      timePerWord: config.timePerWord,
+      completeQuizzes: config.completeQuizzes,
+      completePdfAssignments: config.completePdfAssignments,
+      allowExternalResearch: config.allowExternalResearch,
+      customInstructions: config.customInstructions.slice(0, 4_000),
     })
     .onConflictDoUpdate({
       target: [configuration.userId],
       set: {
-        serviceCredentials: config,
-        ...config,
+        serviceCredentials: {
+          username: config.username,
+          password: config.password,
+        },
+        timePerWord: config.timePerWord,
+        completeQuizzes: config.completeQuizzes,
+        completePdfAssignments: config.completePdfAssignments,
+        allowExternalResearch: config.allowExternalResearch,
+        customInstructions: config.customInstructions.slice(0, 4_000),
       },
     });
 }
