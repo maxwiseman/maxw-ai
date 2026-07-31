@@ -139,14 +139,7 @@ export function AuthModal({ children }: { children?: React.ReactNode }) {
             <PasskeyIcon className="size-5" />
             Sign in with Passkey
           </Button>
-          <Button
-            // onClick={async () => {
-            //   await authClient.signIn.social({ provider: "google" });
-            // }}
-            disabled
-            variant="outline"
-            className="w-full"
-          >
+          <Button disabled variant="outline" className="w-full">
             <GoogleIcon className="size-5" />
             Sign in with Google
           </Button>
