@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -44,12 +44,12 @@ export const configuration = sqliteTable("configuration", {
   timePerWord: real("time_per_word").default(0.1),
   completeQuizzes: integer("complete_quizzes", { mode: "boolean" })
     .notNull()
-    .default(false),
+    .default(sql`0`),
   completePdfAssignments: integer("complete_pdf_assignments", {
     mode: "boolean",
   })
     .notNull()
-    .default(false),
+    .default(sql`0`),
   allowExternalResearch: integer("allow_external_research", {
     mode: "boolean",
   })
