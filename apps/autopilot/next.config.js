@@ -1,13 +1,30 @@
+import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { withBotId } from "botid/next/config";
 import createJiti from "jiti";
+import { withWorkflow } from "workflow/next";
 
 // Import env files to validate at build time. Use jiti so we can load .ts files in here.
 createJiti(fileURLToPath(import.meta.url))("./src/env");
+const appDirectory = dirname(fileURLToPath(import.meta.url));
 
 /** @type {import("next").NextConfig} */
 const config = {
   reactStrictMode: true,
+
+  // Keep the Sandbox SDK in the Node runtime. The alias works around
+  // xdg-app-paths reading an undefined webpack entry filename while Next
+  // collects Workflow route data.
+  webpack(webpackConfig, { isServer }) {
+    if (isServer) {
+      webpackConfig.externals.push("@vercel/sandbox");
+      webpackConfig.resolve.alias["xdg-app-paths"] = resolve(
+        appDirectory,
+        "src/server/xdg-app-paths.cjs",
+      );
+    }
+    return webpackConfig;
+  },
 
   /** Enables hot reloading for local packages without a build step */
   transpilePackages: [
@@ -23,4 +40,4 @@ const config = {
   typescript: { ignoreBuildErrors: true },
 };
 
-export default withBotId(config);
+export default withWorkflow(withBotId(config));

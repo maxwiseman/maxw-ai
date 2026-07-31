@@ -7,18 +7,17 @@ import { Cluster } from "puppeteer-cluster";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 
-import type { Session } from "@acme/auth";
-import { auth } from "@acme/auth";
-
 import type { WSServerMessageSchema } from "./message-schema";
 import { startCrawling } from "./crawling-logic";
 import { WSClientMessageSchema } from "./message-schema";
+import { notifyRunCompleted } from "./run-callback";
 import {
   clearUserStatuses,
   getUserStatuses,
   markPendingStatusesAsError,
 } from "./status-update";
 import { normalizeWhitespace } from "./utils";
+import { verifyWorkerToken } from "./worker-token";
 
 const args = [
   "--no-sandbox",
@@ -98,6 +97,7 @@ await cluster.task((async ({ page, data }) => {
 
     taskManager.delete(data.userId);
     data.sendMessage({ type: "newState", state: { status: "stopped" } });
+    await notifyRunCompleted(data.userId);
   }
 }) as TaskFunction<
   {
@@ -243,21 +243,44 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-serve<WSData, {}>({
-  port: 8080,
+async function getRequestUserId(req: Request): Promise<string | null> {
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token");
+  const secret = process.env.AUTOPILOT_WORKER_SECRET;
+  if (token && secret) {
+    const payload = await verifyWorkerToken(token, secret);
+    if (payload && payload.runId === process.env.AUTOPILOT_RUN_ID) {
+      return payload.userId;
+    }
+    return null;
+  }
+
+  // Keep cookie authentication available for the existing local VM workflow.
+  const { auth } = await import("@acme/auth");
+  const authData = await auth.api.getSession({ headers: req.headers });
+  return authData?.user.id ?? null;
+}
+
+serve<WSData, Record<never, never>>({
+  port: Number(process.env.PORT ?? 8080),
   async fetch(req, server) {
     const url = new URL(req.url);
 
-    const authData = await auth.api.getSession({ headers: req.headers });
-    if (!authData?.session) {
+    if (url.pathname === "/health") {
+      return Response.json({ ok: true });
+    }
+
+    const userId = await getRequestUserId(req);
+    if (!userId) {
       console.error("Unauthorized request");
       return new Response("Unauthorized", { status: 403 });
     }
 
-    console.log("Authenticated as", authData.user.name);
+    console.log("Authenticated user", userId);
 
     if (url.pathname === "/ws") {
-      server.upgrade(req, { data: { auth: authData } });
+      if (server.upgrade(req, { data: { userId } })) return;
+      return new Response("WebSocket upgrade failed", { status: 400 });
     }
     if (url.pathname !== "/mjpeg") {
       return new Response("Not Found", { status: 404 });
@@ -271,7 +294,7 @@ serve<WSData, {}>({
     await sleep(1000);
 
     // const userPage = state[authData.user.id]!.page!;
-    const userPage = taskManager.get(authData.user.id)?.page;
+    const userPage = taskManager.get(userId)?.page;
 
     if (!userPage)
       throw new Error(
@@ -337,18 +360,18 @@ serve<WSData, {}>({
     idleTimeout: 12 * 60, // 12 hours in minutes
     open(ws) {
       const data = ws.data;
-      const prevTask = taskManager.get(data.auth.user.id);
+      const prevTask = taskManager.get(data.userId);
 
       // Add this connection to the task manager
-      taskManager.addConnection(data.auth.user.id, ws);
+      taskManager.addConnection(data.userId, ws);
 
       // Create a sendMessage function that uses the current connection
-      const userId = data.auth.user.id;
+      const userId = data.userId;
       function sendMessage(data: z.infer<typeof WSServerMessageSchema>) {
         taskManager.sendMessageToUser(userId, data);
       }
 
-      taskManager.set(data.auth.user.id, { sendMessage });
+      taskManager.set(data.userId, { sendMessage });
 
       // Send current automation state if running
       if (prevTask?.page) {
@@ -358,73 +381,68 @@ serve<WSData, {}>({
       }
 
       // Send all accumulated status updates to sync the client
-      const userStatuses = getUserStatuses(data.auth.user.id);
+      const userStatuses = getUserStatuses(data.userId);
       if (userStatuses.length > 0) {
         sendMessage({ type: "statusList", statuses: userStatuses });
       }
 
       console.log(
         "New websocket connection established for user:",
-        data.auth.user.id,
+        data.userId,
       );
     },
     close(ws) {
-      const prevTask = taskManager.get(ws.data.auth.user.id);
+      const prevTask = taskManager.get(ws.data.userId);
       if (!prevTask) return;
 
-      taskManager.set(ws.data.auth.user.id, { sendMessage: undefined });
+      taskManager.set(ws.data.userId, { sendMessage: undefined });
 
       // Remove from active connections
-      taskManager.removeConnection(ws.data.auth.user.id);
+      taskManager.removeConnection(ws.data.userId);
 
-      console.log(
-        "Websocket connection closed for user:",
-        ws.data.auth.user.id,
-      );
+      console.log("Websocket connection closed for user:", ws.data.userId);
     },
     async message(ws, msg) {
-      const userId = ws.data.auth.user.id;
+      const userId = ws.data.userId;
       function sendMessage(data: z.infer<typeof WSServerMessageSchema>) {
         taskManager.sendMessageToUser(userId, data);
       }
 
-      const prevTask = taskManager.get(ws.data.auth.user.id);
+      const prevTask = taskManager.get(ws.data.userId);
 
       const parsedMsg = WSClientMessageSchema.parse(
         await JSON.parse(msg as string),
       );
       if (parsedMsg.type === "start") {
-        console.log("Starting crawling for user:", ws.data.auth.user.id);
+        console.log("Starting crawling for user:", ws.data.userId);
 
         // Check if user already has an active task
-        if (taskManager.hasActiveTask(ws.data.auth.user.id)) {
+        if (taskManager.hasActiveTask(ws.data.userId)) {
           console.log("User already has active task, ignoring start command");
           sendMessage({ type: "newState", state: { status: "running" } });
           return;
         }
 
         // Clear old status updates when starting a new session
-        clearUserStatuses(ws.data.auth.user.id);
+        clearUserStatuses(ws.data.userId);
 
         // Send immediate feedback that crawling is starting
         sendMessage({ type: "newState", state: { status: "running" } });
 
         try {
-          console.log("Executing cluster task for user:", ws.data.auth.user.id);
-          const result = await cluster.execute({
-            userId: ws.data.auth.user.id,
+          console.log("Executing cluster task for user:", ws.data.userId);
+          await cluster.execute({
+            userId: ws.data.userId,
             sendMessage,
           });
           console.log(
             "Cluster task execution completed for user:",
-            ws.data.auth.user.id,
-            "Result:",
-            result,
+            ws.data.userId,
           );
         } catch (error) {
           console.error(
             "Cluster execution failed for user:",
-            ws.data.auth.user.id,
+            ws.data.userId,
             error,
           );
           sendMessage({ type: "newState", state: { status: "stopped" } });
@@ -432,14 +450,14 @@ serve<WSData, {}>({
       }
       if (parsedMsg.type === "stop") {
         if (!prevTask) {
-          console.log("No active task found for user:", ws.data.auth.user.id);
+          console.log("No active task found for user:", ws.data.userId);
           return;
         }
 
-        console.log("Stopping task for user:", ws.data.auth.user.id);
+        console.log("Stopping task for user:", ws.data.userId);
 
         // Mark all pending statuses as errors when manually stopping
-        markPendingStatusesAsError(ws.data.auth.user.id, sendMessage);
+        markPendingStatusesAsError(ws.data.userId, sendMessage);
 
         sendMessage({ type: "newState", state: { status: "stopped" } });
         prevTask.abortController?.abort();
@@ -447,15 +465,11 @@ serve<WSData, {}>({
         try {
           await prevTask.page?.close();
         } catch (error) {
-          console.error(
-            "Error closing page for user:",
-            ws.data.auth.user.id,
-            error,
-          );
+          console.error("Error closing page for user:", ws.data.userId, error);
         }
 
         // Clean up task entry
-        taskManager.delete(ws.data.auth.user.id);
+        taskManager.delete(ws.data.userId);
       }
       // if (parsedMsg.type === "start") {
       //   cluster
@@ -472,5 +486,5 @@ console.log("Server started");
 console.log("Active users:", taskManager.getActiveUserIds());
 
 export interface WSData {
-  auth: Session;
+  userId: string;
 }

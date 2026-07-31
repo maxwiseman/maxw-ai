@@ -16,7 +16,7 @@ import { InviteButton } from "./invites";
 import { useLiveState } from "./state-store";
 
 export function Navbar() {
-  const { wsStatus, status, sendMessage } = useLiveState();
+  const { isProvisioning, wsStatus, status, sendMessage } = useLiveState();
 
   return (
     <nav className="sticky top-0 flex h-20 w-full items-center justify-between border-b bg-[#FBFBFB] px-8 dark:bg-[#0A0A0A]">
@@ -32,7 +32,9 @@ export function Navbar() {
       <div className="flex gap-2">
         <InviteButton />
         <Button
-          disabled={wsStatus !== "connected"}
+          disabled={
+            isProvisioning || (status === "running" && wsStatus !== "connected")
+          }
           onClick={() => {
             //   setRunning((prev) => !prev);
             sendMessage({ type: status === "running" ? "stop" : "start" });
@@ -69,7 +71,11 @@ export function Navbar() {
                   perspective: 200,
                 }}
               >
-                {status === "running" ? "Stop" : "Start"}
+                {isProvisioning
+                  ? "Starting"
+                  : status === "running"
+                    ? "Stop"
+                    : "Start"}
               </motion.div>
             </AnimatePresence>
           </div>

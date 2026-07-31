@@ -2,14 +2,19 @@
 
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import { createContext, useContext, useEffect } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import useWebsocket, { ReadyState } from "react-use-websocket";
 import { create } from "zustand";
 
 import type { WSClientMessageSchema } from "@acme/autopilot-backend/message-schema";
 import { WSServerMessageSchema } from "@acme/autopilot-backend/message-schema";
-
-import { env } from "~/env";
 
 // Define status types directly to avoid import issues
 export interface StatusUpdate {
@@ -23,6 +28,8 @@ export interface StatusUpdate {
 interface AutopilotState {
   status: "running" | "stopped";
   wsStatus: "connected" | "connecting" | "disconnected" | "disconnecting";
+  isProvisioning: boolean;
+  previewUrl: string | null;
   updates: string[];
   statuses: StatusUpdate[];
   updateState: (newState: Partial<AutopilotState>) => void;
@@ -32,9 +39,11 @@ interface AutopilotState {
   clearStatuses: () => void;
 }
 
-export const useStateStore = create<AutopilotState>()((set, get) => ({
+export const useStateStore = create<AutopilotState>()((set) => ({
   status: "stopped",
   wsStatus: "disconnected",
+  isProvisioning: true,
+  previewUrl: null,
   updates: [],
   statuses: [],
   updateState: (newState) => {
@@ -82,11 +91,136 @@ interface WebSocketContextType {
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
+interface RunConnection {
+  runId: string;
+  status: "ready";
+  token: string;
+  workerUrl: string;
+}
+
+type RunState =
+  | RunConnection
+  | {
+      lastError?: string | null;
+      runId: string;
+      status: "provisioning" | "stopping" | "stopped" | "error";
+    }
+  | null;
+
+function workerUrl(connection: RunConnection, path: string): string {
+  const url = new URL(path, connection.workerUrl);
+  url.searchParams.set("token", connection.token);
+  return url.toString();
+}
+
+function websocketUrl(connection: RunConnection): string {
+  const url = new URL(workerUrl(connection, "/ws"));
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}
+
+async function fetchRun(method: "GET" | "POST" | "DELETE" = "GET") {
+  const response = await fetch("/api/autopilot/run", {
+    cache: "no-store",
+    method,
+  });
+  if (method === "DELETE") return null;
+  if (!response.ok) throw new Error(`Run request failed (${response.status})`);
+  return (await response.json()) as { run: RunState };
+}
+
+async function waitForConnection(): Promise<RunConnection> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const result = await fetchRun();
+    if (result?.run?.status === "ready") return result.run;
+    if (result?.run?.status === "error") {
+      throw new Error(result.run.lastError ?? "Sandbox provisioning failed");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error("Sandbox provisioning timed out");
+}
+
 // WebSocket Provider Component
 export function WebSocketProvider({ children }: { children: ReactNode }) {
-  const ws = useWebsocket(`${env.NEXT_PUBLIC_BACKEND_URL}/ws`, {
-    reconnectAttempts: 3,
-    shouldReconnect: () => true,
+  const [connection, setConnection] = useState<RunConnection | null>(null);
+  const pendingStartRef = useRef(false);
+  const provisioningRef = useRef<Promise<void> | null>(null);
+
+  const endRun = useCallback(async () => {
+    try {
+      await fetchRun("DELETE");
+    } catch (error) {
+      console.warn("Failed to request sandbox shutdown", error);
+    } finally {
+      setConnection(null);
+      useStateStore.getState().updateState({
+        isProvisioning: false,
+        previewUrl: null,
+      });
+    }
+  }, []);
+
+  const provision = useCallback(async () => {
+    if (provisioningRef.current) return provisioningRef.current;
+    const request = (async () => {
+      useStateStore.getState().updateState({ isProvisioning: true });
+      try {
+        const started = await fetchRun("POST");
+        const ready =
+          started?.run?.status === "ready"
+            ? started.run
+            : await waitForConnection();
+        setConnection(ready);
+        useStateStore.getState().updateState({
+          previewUrl: workerUrl(ready, "/mjpeg"),
+        });
+      } catch (error) {
+        console.error("Failed to provision Autopilot sandbox", error);
+        pendingStartRef.current = false;
+        useStateStore.getState().updateState({ isProvisioning: false });
+      } finally {
+        provisioningRef.current = null;
+      }
+    })();
+    provisioningRef.current = request;
+    return request;
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const current = await fetchRun();
+        if (!current) {
+          useStateStore.getState().updateState({ isProvisioning: false });
+          return;
+        }
+        const run = current.run;
+        if (!run) {
+          useStateStore.getState().updateState({ isProvisioning: false });
+          return;
+        }
+        if (run.status === "ready") {
+          setConnection(run);
+          useStateStore.getState().updateState({
+            previewUrl: workerUrl(run, "/mjpeg"),
+          });
+        } else if (run.status === "provisioning") {
+          await provision();
+        } else {
+          useStateStore.getState().updateState({ isProvisioning: false });
+        }
+      } catch (error) {
+        console.warn("Failed to restore Autopilot run", error);
+        useStateStore.getState().updateState({ isProvisioning: false });
+      }
+    })();
+  }, [provision]);
+
+  const ws = useWebsocket(connection ? websocketUrl(connection) : null, {
+    reconnectAttempts: 10,
+    reconnectInterval: 1_000,
+    shouldReconnect: () => connection !== null,
     onError: (event) => {
       console.error("WebSocket error:", event);
     },
@@ -95,6 +229,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     },
     onOpen: () => {
       console.log("WebSocket opened");
+      if (pendingStartRef.current) {
+        pendingStartRef.current = false;
+        ws.sendJsonMessage({ type: "start" });
+      }
+      useStateStore.getState().updateState({ isProvisioning: false });
     },
   });
 
@@ -117,14 +256,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       const parsedMessage = WSServerMessageSchema.parse(ws.lastJsonMessage);
 
       if (parsedMessage.type === "newState") {
+        const previousStatus = useStateStore.getState().status;
         useStateStore.getState().updateState(parsedMessage.state);
 
         // Clear local statuses when automation starts fresh
         if (
           parsedMessage.state.status === "running" &&
-          useStateStore.getState().status === "stopped"
+          previousStatus === "stopped"
         ) {
           useStateStore.getState().clearStatuses();
+        }
+        if (
+          previousStatus === "running" &&
+          parsedMessage.state.status === "stopped"
+        ) {
+          void endRun();
         }
       } else if (parsedMessage.type === "statusUpdate") {
         // Check if this status already exists (update) or is new (add)
@@ -142,7 +288,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn("Failed to parse websocket message:", error);
     }
-  }, [ws.lastJsonMessage]);
+  }, [endRun, ws.lastJsonMessage]);
 
   useEffect(() => {
     useStateStore.getState().updateState({
@@ -158,6 +304,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const contextValue: WebSocketContextType = {
     sendMessage: (data: z.input<typeof WSClientMessageSchema>) => {
+      if (data.type === "start" && ws.readyState !== ReadyState.OPEN) {
+        pendingStartRef.current = true;
+        void provision();
+        return;
+      }
       ws.sendJsonMessage(data);
     },
   };

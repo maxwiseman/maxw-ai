@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
+  index,
+  integer,
   real,
   sqliteTableCreator,
   text,
@@ -41,3 +43,48 @@ export const configuration = sqliteTable("configuration", {
   }>(),
   timePerWord: real("time_per_word").default(0.1),
 });
+
+export const autopilotRunStatuses = [
+  "provisioning",
+  "ready",
+  "stopping",
+  "stopped",
+  "error",
+] as const;
+
+export type AutopilotRunStatus = (typeof autopilotRunStatuses)[number];
+
+export const autopilotRun = sqliteTable(
+  "run",
+  {
+    id: text("id").notNull().unique(),
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sandboxName: text("sandbox_name").notNull().unique(),
+    workflowRunId: text("workflow_run_id"),
+    workerUrl: text("worker_url"),
+    status: text("status", { enum: autopilotRunStatuses })
+      .notNull()
+      .default("provisioning"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date())
+      .$onUpdateFn(() => new Date()),
+  },
+  (table) => [
+    index("autopilot_run_status_index").on(table.status),
+    uniqueIndex("autopilot_run_sandbox_name_index").on(table.sandboxName),
+  ],
+);
+
+export const autopilotRunRelations = relations(autopilotRun, ({ one }) => ({
+  user: one(user, {
+    fields: [autopilotRun.userId],
+    references: [user.id],
+  }),
+}));

@@ -1,28 +1,64 @@
-# Create T3 App
+# Autopilot on Vercel Sandbox
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Autopilot runs its Next.js control plane on Vercel and creates one named,
+persistent Vercel Sandbox for each active automation run. Chromium, Puppeteer,
+the WebSocket server, and the MJPEG preview all run inside that Sandbox.
 
-## What's next? How do I make an app with this?
+## Why Workflow and Sandbox are separate
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- Vercel Workflow durably owns provisioning, the completion hook, the 24-hour
+  deadline, retries, and cleanup.
+- Vercel Sandbox owns the continuous Bun/Chromium process and published port.
+- Turso stores the run ID, deterministic Sandbox name, Workflow run ID, state,
+  and worker URL.
+- The browser receives a signed run token, never Sandbox or Vercel credentials.
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+Reloading the page does not start a second run. `GET /api/autopilot/run` looks
+up the current run by user, issues a fresh signed token, and reconnects the UI
+to the same named Sandbox. The worker deliberately keeps its Puppeteer task
+alive when a WebSocket disconnects. When the replacement connection opens, it
+sends the current running/stopped state and its accumulated status list.
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+If the Sandbox itself reaches its platform timeout or crashes, its filesystem
+can be restored, but a live Chromium process cannot. That case becomes a new
+Autopilot run rather than pretending the browser session was recoverable.
 
-## Learn More
+## One-time deployment setup
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+1. Use a Vercel Pro or Enterprise project if runs need longer than Hobby's
+   Sandbox duration limit.
+2. Set these project environment variables:
+   - `AUTOPILOT_WORKER_SECRET` (at least 32 random characters)
+   - `OPENAI_API_KEY`
+   - `DATABASE_URL`
+   - `DATABASE_AUTH_TOKEN`
+   - `AUTH_SECRET`
+   - `BETTER_AUTH_URL`
+   - the existing OAuth variables
+3. Optionally set `AUTOPILOT_SANDBOX_REPO_URL`,
+   `AUTOPILOT_SANDBOX_REPO_REF`, and `AUTOPILOT_SANDBOX_VCPUS`.
+4. If the Git repository is private, also set
+   `AUTOPILOT_SANDBOX_REPO_USERNAME=x-access-token` and a fine-grained GitHub
+   token in `AUTOPILOT_SANDBOX_REPO_PASSWORD`.
+5. Apply the new `autopilot_run` table:
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+   ```bash
+   bun db:push
+   ```
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+6. Deploy `apps/autopilot` to Vercel. Vercel OIDC authenticates Sandbox and
+   Workflow automatically in production.
 
-## How do I deploy this?
+For local Sandbox provisioning, link/pull the Vercel project so an OIDC token is
+available, or set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`.
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+## Lifecycle
+
+1. Start creates a database run and starts `manageAutopilotRun`.
+2. Workflow registers its private completion hook before provisioning.
+3. A named Sandbox checks out the exact Vercel Git commit, installs Bun and
+   Chromium dependencies, and starts `@acme/autopilot-backend` on port 8080.
+4. The client polls until the worker is ready, then opens the signed WebSocket.
+5. Worker completion resumes the Workflow hook.
+6. Workflow stops and snapshots the Sandbox and marks the run stopped.
+7. A 24-hour durable timeout performs the same cleanup if no callback arrives.

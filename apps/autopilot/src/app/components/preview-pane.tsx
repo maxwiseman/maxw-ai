@@ -1,11 +1,10 @@
 "use client";
 
-import { env } from "~/env";
 import { cn } from "~/lib/utils";
 import { useLiveState } from "./state-store";
 
 export function PreviewPane() {
-  const { status } = useLiveState();
+  const { previewUrl, status } = useLiveState();
 
   const open = true;
 
@@ -16,12 +15,13 @@ export function PreviewPane() {
         { "w-0 px-0": !open },
       )}
     >
-      {status === "running" ? (
+      {status === "running" && previewUrl ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="rounded-md border shadow-xl/2"
-            src={`${env.NEXT_PUBLIC_BACKEND_URL}/mjpeg`}
+            referrerPolicy="no-referrer"
+            src={previewUrl}
           />
         </>
       ) : (

@@ -10,7 +10,6 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),
-    NEXT_PUBLIC_BACKEND_URL: z.string().url(),
   },
   /**
    * Specify your server-side environment variables schema here.
@@ -19,6 +18,20 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
     DATABASE_AUTH_TOKEN: z.string(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    AUTOPILOT_WORKER_SECRET: z.string().min(32).optional(),
+    AUTOPILOT_SANDBOX_REPO_URL: z
+      .string()
+      .url()
+      .default("https://github.com/maxwiseman/maxw-ai.git"),
+    AUTOPILOT_SANDBOX_REPO_REF: z.string().min(1).default("master"),
+    AUTOPILOT_SANDBOX_REPO_USERNAME: z.string().min(1).optional(),
+    AUTOPILOT_SANDBOX_REPO_PASSWORD: z.string().min(1).optional(),
+    AUTOPILOT_SANDBOX_VCPUS: z.coerce.number().int().min(1).max(8).default(4),
+    VERCEL_GIT_COMMIT_SHA: z.string().min(1).optional(),
+    VERCEL_TOKEN: z.string().min(1).optional(),
+    VERCEL_TEAM_ID: z.string().min(1).optional(),
+    VERCEL_PROJECT_ID: z.string().min(1).optional(),
   },
 
   /**
@@ -33,7 +46,6 @@ export const env = createEnv({
    */
   experimental__runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   skipValidation:
