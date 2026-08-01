@@ -12,6 +12,7 @@ const SANDBOX_PORT = 8080;
 const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
 const BASE_READY_PATH = "/vercel/sandbox/.autopilot/base-ready";
 const BASE_SANDBOX_NAME_PREFIX = "autopilot-base";
+const PUPPETEER_CACHE_DIR = "/vercel/sandbox/.cache/puppeteer";
 // Hobby projects allow Sandbox sessions up to 45 minutes. Use a small margin
 // so this deployment works on every Vercel plan. The shared base Sandbox is
 // persistent, while each user Sandbox is deleted when its run finishes.
@@ -103,7 +104,7 @@ function getSandboxEnvironment(input: AutopilotRunInput) {
     DATABASE_URL: env.DATABASE_URL,
     NODE_ENV: "production",
     PORT: String(SANDBOX_PORT),
-    PUPPETEER_CACHE_DIR: "/vercel/sandbox/.cache/puppeteer",
+    PUPPETEER_CACHE_DIR,
   };
 }
 
@@ -205,6 +206,7 @@ async function getBaseSnapshotId(): Promise<string> {
 
   const baseSandbox = await Sandbox.getOrCreate({
     ...credentials,
+    env: { PUPPETEER_CACHE_DIR },
     keepLastSnapshots: { count: 1 },
     name,
     onCreate: bootstrapSandbox,
@@ -276,7 +278,14 @@ async function startWorker(sandbox: Sandbox): Promise<string> {
     if (await isWorkerHealthy(workerUrl)) return workerUrl;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  throw new Error("Autopilot worker did not become healthy within 30 seconds");
+  const logs = await sandbox.runCommand({
+    args: ["-n", "60", WORKER_LOG_PATH],
+    cmd: "tail",
+  });
+  const detail = logs.exitCode === 0 ? (await logs.stdout()).trim() : "";
+  throw new Error(
+    `Autopilot worker did not become healthy within 30 seconds${detail ? `:\n${detail.slice(-2_000)}` : ""}`,
+  );
 }
 
 export async function provisionAutopilotSandbox(
