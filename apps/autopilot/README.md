@@ -64,8 +64,12 @@ available, or set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`.
 
 1. Start creates a database run and starts `manageAutopilotRun`.
 2. Workflow registers its private completion hook before provisioning.
-3. A named Sandbox checks out the exact Vercel Git commit, installs Bun and
-   Chromium dependencies, and starts `@acme/autopilot-backend` on port 8080.
+3. The first run for a deployed Git revision creates a shared base Sandbox,
+   installs Bun and Chromium dependencies, and snapshots it. Each user Sandbox
+   starts from that prepared snapshot and launches `@acme/autopilot-backend` on
+   port 8080 without repeating the installation. A new deployment revision
+   automatically creates a new base snapshot; an unchanged deployment rebuilds
+   it after the seven-day snapshot expiration.
 4. The client polls until the worker is ready, then opens the signed WebSocket.
 5. The worker heartbeats independently of browser activity. Workflow checks it
    every five minutes and treats a stale heartbeat as a lost worker.

@@ -10,6 +10,8 @@ import { requiredWorkerSecret } from "~/server/autopilot-run";
 
 const SANDBOX_PORT = 8080;
 const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
+const BASE_READY_PATH = "/vercel/sandbox/.autopilot/base-ready";
+const BASE_SANDBOX_NAME_PREFIX = "autopilot-base";
 // Hobby projects allow Sandbox sessions up to 45 minutes. Use a small margin
 // so this deployment works on every Vercel plan; named Sandbox persistence
 // still preserves the filesystem between sessions.
@@ -75,6 +77,15 @@ function getSandboxSource() {
   return base;
 }
 
+function getBaseSandboxName(): string {
+  const revision = env.VERCEL_GIT_COMMIT_SHA ?? env.AUTOPILOT_SANDBOX_REPO_REF;
+  const safeRevision = revision
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-")
+    .slice(0, 48);
+  return `${BASE_SANDBOX_NAME_PREFIX}-${safeRevision}`;
+}
+
 function getSandboxEnvironment(input: AutopilotRunInput) {
   if (!env.AI_GATEWAY_API_KEY) {
     throw new Error("AI_GATEWAY_API_KEY must be configured");
@@ -127,6 +138,63 @@ async function bootstrapSandbox(sandbox: Sandbox): Promise<void> {
     args: ["puppeteer", "browsers", "install", "chrome"],
     cmd: "bunx",
   });
+  await assertCommandSucceeded(sandbox, {
+    args: ["-p", "/vercel/sandbox/.autopilot"],
+    cmd: "mkdir",
+  });
+  await assertCommandSucceeded(sandbox, {
+    args: [BASE_READY_PATH],
+    cmd: "touch",
+  });
+}
+
+async function isBaseSandboxReady(sandbox: Sandbox): Promise<boolean> {
+  const result = await sandbox.runCommand({
+    args: ["-f", BASE_READY_PATH],
+    cmd: "test",
+  });
+  return result.exitCode === 0;
+}
+
+async function getBaseSnapshotId(): Promise<string> {
+  const { Sandbox } = await import("@vercel/sandbox");
+  const credentials = getSandboxCredentials();
+  const name = getBaseSandboxName();
+  const baseSandbox = await Sandbox.getOrCreate({
+    ...credentials,
+    keepLastSnapshots: { count: 1 },
+    name,
+    onCreate: bootstrapSandbox,
+    persistent: true,
+    resources: { vcpus: env.AUTOPILOT_SANDBOX_VCPUS },
+    resume: false,
+    snapshotExpiration: SNAPSHOT_EXPIRATION_MS,
+    source: getSandboxSource(),
+    timeout: SANDBOX_TIMEOUT_MS,
+  });
+
+  if (baseSandbox.currentSnapshotId) return baseSandbox.currentSnapshotId;
+  if (!(await isBaseSandboxReady(baseSandbox))) {
+    await bootstrapSandbox(baseSandbox);
+  }
+
+  try {
+    const snapshot = await baseSandbox.snapshot({
+      expiration: SNAPSHOT_EXPIRATION_MS,
+    });
+    return snapshot.snapshotId;
+  } catch (error) {
+    // Another concurrent provision may have snapshotted the shared base first.
+    const refreshedBase = await Sandbox.get({
+      ...credentials,
+      name,
+      resume: false,
+    });
+    if (refreshedBase.currentSnapshotId) {
+      return refreshedBase.currentSnapshotId;
+    }
+    throw error;
+  }
 }
 
 async function isWorkerHealthy(workerUrl: string): Promise<boolean> {
@@ -171,17 +239,17 @@ export async function provisionAutopilotSandbox(
 ): Promise<{ workerUrl: string }> {
   const { Sandbox } = await import("@vercel/sandbox");
   try {
+    const baseSnapshotId = await getBaseSnapshotId();
     const sandbox = await Sandbox.getOrCreate({
       ...getSandboxCredentials(),
       env: getSandboxEnvironment(input),
       keepLastSnapshots: { count: 1 },
       name: input.sandboxName,
-      onCreate: bootstrapSandbox,
       persistent: true,
       ports: [SANDBOX_PORT],
       resources: { vcpus: env.AUTOPILOT_SANDBOX_VCPUS },
       snapshotExpiration: SNAPSHOT_EXPIRATION_MS,
-      source: getSandboxSource(),
+      source: { snapshotId: baseSnapshotId, type: "snapshot" },
       timeout: SANDBOX_TIMEOUT_MS,
     });
     const workerUrl = await startWorker(sandbox);
