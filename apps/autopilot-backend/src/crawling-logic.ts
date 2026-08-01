@@ -1,6 +1,6 @@
 import type { Frame, Page } from "puppeteer";
+import type { z } from "zod";
 import { sleep } from "bun";
-import { z } from "zod";
 
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
@@ -11,11 +11,13 @@ import { runAgentActivity } from "./activity-agent";
 import { createStatus } from "./status-update";
 import { waitAndClick, waitAndType } from "./utils";
 
-const LOGIN_URL =
-  "https://account.activedirectory.windowsazure.com/applications/signin/6be35607-d39b-4ec5-8b6f-bb7ec0fdc57a?tenantId=a2c165ce-3db2-4317-b742-8b26460ec108";
+const EDGENUITY_LOGIN_URL =
+  "https://auth.edgenuity.com/Login/SAML/Student/KnoxSchoolsTN";
+const EDGENUITY_STUDENT_HOST = "student.edgenuity.com";
 
 const SELECTORS = {
   ACTIVITY_TITLE: "#activity-title",
+  CLASSLINK_MICROSOFT_BUTTON: "button.microsoft",
   CONTINUE_BUTTON: 'input[value="Continue"]',
   DISPLAY_NAME: "#displayName",
   DUPLICATE_SESSION: ".duplicate-session-main-header",
@@ -34,6 +36,7 @@ const SELECTORS = {
 } as const;
 
 const TIMEOUTS = {
+  AUTHENTICATION: 30_000,
   DEFAULT: 10_000,
   DUPLICATE_SESSION: 3_000,
   NEXT_ACTIVITY: 5_000,
@@ -89,10 +92,24 @@ class EducationalPlatformAutomation {
       this.options.sendMessage,
     );
 
-    await this.options.userPage.goto(LOGIN_URL, {
+    await this.options.userPage.goto(EDGENUITY_LOGIN_URL, {
       timeout: TIMEOUTS.DEFAULT,
       waitUntil: "domcontentloaded",
     });
+    await this.options.userPage.waitForSelector(
+      SELECTORS.CLASSLINK_MICROSOFT_BUTTON,
+      { timeout: TIMEOUTS.AUTHENTICATION, visible: true },
+    );
+    await this.options.userPage.waitForNetworkIdle({
+      idleTime: 500,
+      timeout: TIMEOUTS.AUTHENTICATION,
+    });
+    await Promise.all([
+      this.options.userPage.waitForSelector(SELECTORS.EMAIL_INPUT, {
+        timeout: TIMEOUTS.AUTHENTICATION,
+      }),
+      this.options.userPage.click(SELECTORS.CLASSLINK_MICROSOFT_BUTTON),
+    ]);
     await waitAndType(
       this.options.userPage,
       SELECTORS.EMAIL_INPUT,
@@ -105,15 +122,24 @@ class EducationalPlatformAutomation {
       SELECTORS.PASSWORD_INPUT,
       credentials.password,
     );
-    await waitAndClick(this.options.userPage, SELECTORS.SUBMIT_BUTTON);
-    await this.options.userPage.waitForNavigation({
-      waitUntil: "domcontentloaded",
-    });
+    await Promise.all([
+      this.options.userPage.waitForNavigation({
+        waitUntil: "domcontentloaded",
+      }),
+      waitAndClick(this.options.userPage, SELECTORS.SUBMIT_BUTTON),
+    ]);
     await this.options.userPage.waitForSelector(SELECTORS.HEADING);
-    await waitAndClick(this.options.userPage, SELECTORS.SUBMIT_BUTTON);
-    await this.options.userPage.waitForNavigation({
-      waitUntil: "domcontentloaded",
-    });
+    await Promise.all([
+      this.options.userPage.waitForNavigation({
+        waitUntil: "domcontentloaded",
+      }),
+      waitAndClick(this.options.userPage, SELECTORS.SUBMIT_BUTTON),
+    ]);
+    await this.options.userPage.waitForFunction(
+      (hostname) => window.location.hostname === hostname,
+      { timeout: TIMEOUTS.AUTHENTICATION },
+      EDGENUITY_STUDENT_HOST,
+    );
 
     try {
       await this.options.userPage.waitForSelector(SELECTORS.DUPLICATE_SESSION, {
