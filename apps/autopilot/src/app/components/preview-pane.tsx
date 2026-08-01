@@ -60,7 +60,7 @@ function StartupChecklist({ stage }: { stage: ProvisioningStage | null }) {
             >
               <span
                 aria-hidden="true"
-                className={cn("w-5 text-center", {
+                className={cn("text-center text-nowrap", {
                   "text-emerald-500": complete,
                   "animate-pulse": active,
                 })}
