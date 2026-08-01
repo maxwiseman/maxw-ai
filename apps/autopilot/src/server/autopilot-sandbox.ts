@@ -1,6 +1,7 @@
 import type { Sandbox } from "@vercel/sandbox";
 import { eq } from "drizzle-orm";
 
+import type { AutopilotRunProvisioningStage } from "@acme/db/schema";
 import { db } from "@acme/db/client";
 import { autopilotRun, sandboxBaseSnapshot } from "@acme/db/schema";
 
@@ -197,13 +198,28 @@ async function storeBaseSnapshotId(
   return snapshotId;
 }
 
-async function getBaseSnapshotId(): Promise<string> {
+async function setProvisioningStage(
+  runId: string,
+  provisioningStage: AutopilotRunProvisioningStage,
+): Promise<void> {
+  await db
+    .update(autopilotRun)
+    .set({ provisioningStage })
+    .where(eq(autopilotRun.id, runId));
+}
+
+async function getBaseSnapshotId(runId: string): Promise<string> {
   const { Sandbox } = await import("@vercel/sandbox");
   const credentials = getSandboxCredentials();
   const name = getBaseSandboxName();
+  await setProvisioningStage(runId, "preparing_environment");
   const existingSnapshotId = await getStoredBaseSnapshotId(name);
-  if (existingSnapshotId) return existingSnapshotId;
+  if (existingSnapshotId) {
+    await setProvisioningStage(runId, "restoring_snapshot");
+    return existingSnapshotId;
+  }
 
+  await setProvisioningStage(runId, "installing_dependencies");
   const baseSandbox = await Sandbox.getOrCreate({
     ...credentials,
     env: { PUPPETEER_CACHE_DIR },
@@ -293,7 +309,8 @@ export async function provisionAutopilotSandbox(
 ): Promise<{ workerUrl: string }> {
   const { Sandbox } = await import("@vercel/sandbox");
   try {
-    const baseSnapshotId = await getBaseSnapshotId();
+    const baseSnapshotId = await getBaseSnapshotId(input.runId);
+    await setProvisioningStage(input.runId, "creating_sandbox");
     const sandbox = await Sandbox.getOrCreate({
       ...getSandboxCredentials(),
       env: getSandboxEnvironment(input),
@@ -304,10 +321,16 @@ export async function provisionAutopilotSandbox(
       source: { snapshotId: baseSnapshotId, type: "snapshot" },
       timeout: SANDBOX_TIMEOUT_MS,
     });
+    await setProvisioningStage(input.runId, "starting_worker");
     const workerUrl = await startWorker(sandbox);
     await db
       .update(autopilotRun)
-      .set({ lastError: null, status: "ready", workerUrl })
+      .set({
+        lastError: null,
+        provisioningStage: null,
+        status: "ready",
+        workerUrl,
+      })
       .where(eq(autopilotRun.id, input.runId));
     return { workerUrl };
   } catch (error) {
@@ -315,6 +338,7 @@ export async function provisionAutopilotSandbox(
       .update(autopilotRun)
       .set({
         lastError: error instanceof Error ? error.message : String(error),
+        provisioningStage: null,
       })
       .where(eq(autopilotRun.id, input.runId));
     throw error;
@@ -360,6 +384,7 @@ export async function deleteAutopilotSandbox(
       .update(autopilotRun)
       .set({
         ...(workerError ? { lastError: workerError } : {}),
+        provisioningStage: null,
         status: finalStatus,
         workerUrl: null,
       })

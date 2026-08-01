@@ -31,10 +31,19 @@ export interface AgentInputRequest {
   question: string;
 }
 
+export type ProvisioningStage =
+  | "preparing_environment"
+  | "installing_dependencies"
+  | "restoring_snapshot"
+  | "creating_sandbox"
+  | "starting_worker"
+  | "connecting";
+
 interface AutopilotState {
   status: "running" | "stopped";
   wsStatus: "connected" | "connecting" | "disconnected" | "disconnecting";
   isProvisioning: boolean;
+  provisioningStage: ProvisioningStage | null;
   previewUrl: string | null;
   inputRequest: AgentInputRequest | null;
   updates: string[];
@@ -50,6 +59,7 @@ export const useStateStore = create<AutopilotState>()((set) => ({
   status: "stopped",
   wsStatus: "disconnected",
   isProvisioning: true,
+  provisioningStage: null,
   previewUrl: null,
   inputRequest: null,
   updates: [],
@@ -111,6 +121,7 @@ type RunState =
   | RunConnection
   | {
       lastError?: string | null;
+      provisioningStage?: ProvisioningStage | null;
       runId: string;
       status: "provisioning" | "stopping" | "stopped" | "error";
     }
@@ -142,6 +153,12 @@ async function waitForConnection(): Promise<RunConnection> {
   for (let attempt = 0; attempt < 300; attempt += 1) {
     const result = await fetchRun();
     if (result?.run?.status === "ready") return result.run;
+    if (result?.run?.status === "provisioning") {
+      useStateStore.getState().updateState({
+        provisioningStage:
+          result.run.provisioningStage ?? "preparing_environment",
+      });
+    }
     if (result?.run?.status === "error") {
       throw new Error(result.run.lastError ?? "Sandbox provisioning failed");
     }
@@ -166,6 +183,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       useStateStore.getState().updateState({
         isProvisioning: false,
         previewUrl: null,
+        provisioningStage: null,
       });
     }
   }, []);
@@ -176,6 +194,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       useStateStore.getState().updateState({ isProvisioning: true });
       try {
         const started = await fetchRun("POST");
+        if (started?.run?.status === "provisioning") {
+          useStateStore.getState().updateState({
+            provisioningStage:
+              started.run.provisioningStage ?? "preparing_environment",
+          });
+        }
         const ready =
           started?.run?.status === "ready"
             ? started.run
@@ -183,11 +207,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         setConnection(ready);
         useStateStore.getState().updateState({
           previewUrl: workerUrl(ready, "/mjpeg"),
+          provisioningStage: "connecting",
         });
       } catch (error) {
         console.error("Failed to provision Autopilot sandbox", error);
         pendingStartRef.current = false;
-        useStateStore.getState().updateState({ isProvisioning: false });
+        useStateStore.getState().updateState({
+          isProvisioning: false,
+          provisioningStage: null,
+        });
       } finally {
         provisioningRef.current = null;
       }
@@ -201,27 +229,40 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       try {
         const current = await fetchRun();
         if (!current) {
-          useStateStore.getState().updateState({ isProvisioning: false });
+          useStateStore.getState().updateState({
+            isProvisioning: false,
+            provisioningStage: null,
+          });
           return;
         }
         const run = current.run;
         if (!run) {
-          useStateStore.getState().updateState({ isProvisioning: false });
+          useStateStore.getState().updateState({
+            isProvisioning: false,
+            provisioningStage: null,
+          });
           return;
         }
         if (run.status === "ready") {
           setConnection(run);
           useStateStore.getState().updateState({
             previewUrl: workerUrl(run, "/mjpeg"),
+            provisioningStage: "connecting",
           });
         } else if (run.status === "provisioning") {
           await provision();
         } else {
-          useStateStore.getState().updateState({ isProvisioning: false });
+          useStateStore.getState().updateState({
+            isProvisioning: false,
+            provisioningStage: null,
+          });
         }
       } catch (error) {
         console.warn("Failed to restore Autopilot run", error);
-        useStateStore.getState().updateState({ isProvisioning: false });
+        useStateStore.getState().updateState({
+          isProvisioning: false,
+          provisioningStage: null,
+        });
       }
     })();
   }, [provision]);
@@ -242,7 +283,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         pendingStartRef.current = false;
         ws.sendJsonMessage({ type: "start" });
       }
-      useStateStore.getState().updateState({ isProvisioning: false });
+      useStateStore.getState().updateState({
+        isProvisioning: false,
+        provisioningStage: null,
+      });
     },
   });
 

@@ -32,6 +32,7 @@ export async function GET() {
   return Response.json({
     run: connection ?? {
       lastError: run.lastError,
+      provisioningStage: run.provisioningStage,
       runId: run.id,
       status: run.status,
     },
@@ -53,7 +54,11 @@ export async function POST() {
     const connection = await createAutopilotConnection(existing);
     return Response.json(
       {
-        run: connection ?? { runId: existing.id, status: existing.status },
+        run: connection ?? {
+          provisioningStage: existing.provisioningStage,
+          runId: existing.id,
+          status: existing.status,
+        },
       },
       { status: connection ? 200 : 202 },
     );
@@ -71,6 +76,7 @@ export async function POST() {
     .values({
       id: input.runId,
       sandboxName: input.sandboxName,
+      provisioningStage: "preparing_environment",
       status: "provisioning",
       userId: input.userId,
     })
@@ -83,6 +89,7 @@ export async function POST() {
         status: "provisioning",
         lastHeartbeatAt: null,
         notificationSentAt: null,
+        provisioningStage: "preparing_environment",
         stopReason: null,
         workerUrl: null,
         workflowRunId: null,
@@ -100,6 +107,7 @@ export async function POST() {
       .update(autopilotRun)
       .set({
         lastError: error instanceof Error ? error.message : String(error),
+        provisioningStage: null,
         status: "error",
       })
       .where(eq(autopilotRun.id, runId));
@@ -107,7 +115,13 @@ export async function POST() {
   }
 
   return Response.json(
-    { run: { runId, status: "provisioning" } },
+    {
+      run: {
+        provisioningStage: "preparing_environment",
+        runId,
+        status: "provisioning",
+      },
+    },
     { status: 202 },
   );
 }

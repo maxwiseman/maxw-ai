@@ -78,6 +78,17 @@ export const autopilotRunStatuses = [
 
 export type AutopilotRunStatus = (typeof autopilotRunStatuses)[number];
 
+export const autopilotRunProvisioningStages = [
+  "preparing_environment",
+  "installing_dependencies",
+  "restoring_snapshot",
+  "creating_sandbox",
+  "starting_worker",
+] as const;
+
+export type AutopilotRunProvisioningStage =
+  (typeof autopilotRunProvisioningStages)[number];
+
 export const autopilotRunStopReasons = [
   "manual",
   "completed",
@@ -110,6 +121,9 @@ export const autopilotRun = sqliteTable(
     status: text("status", { enum: autopilotRunStatuses })
       .notNull()
       .default("provisioning"),
+    provisioningStage: text("provisioning_stage", {
+      enum: autopilotRunProvisioningStages,
+    }),
     lastError: text("last_error"),
     lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp" }),
     stopReason: text("stop_reason", { enum: autopilotRunStopReasons }),
