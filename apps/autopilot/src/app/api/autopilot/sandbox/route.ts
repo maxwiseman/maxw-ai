@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if (action === "provision") {
     await controller.provisionAutopilotSandbox(input);
   } else {
-    await controller.stopAutopilotSandbox(input, finalStatus);
+    await controller.deleteAutopilotSandbox(input, finalStatus);
   }
   return new Response(null, { status: 204 });
 }

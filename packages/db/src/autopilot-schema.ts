@@ -88,6 +88,15 @@ export const autopilotRunStopReasons = [
 
 export type AutopilotRunStopReason = (typeof autopilotRunStopReasons)[number];
 
+export const sandboxBaseSnapshot = sqliteTable("sandbox_base_snapshot", {
+  revision: text("revision").primaryKey(),
+  snapshotId: text("snapshot_id").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date())
+    .$onUpdateFn(() => new Date()),
+});
+
 export const autopilotRun = sqliteTable(
   "run",
   {

@@ -69,14 +69,17 @@ available, or set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`.
    starts from that prepared snapshot and launches `@acme/autopilot-backend` on
    port 8080 without repeating the installation. A new deployment revision
    automatically creates a new base snapshot; an unchanged deployment rebuilds
-   it after the seven-day snapshot expiration.
+   it after the seven-day snapshot expiration. The database stores the snapshot
+   ID by revision so runs can reuse it even if Vercel has already removed the
+   stopped base Sandbox record.
 4. The client polls until the worker is ready, then opens the signed WebSocket.
 5. The worker heartbeats independently of browser activity. Workflow checks it
    every five minutes and treats a stale heartbeat as a lost worker.
 6. Worker completion resumes the Workflow hook.
-7. Workflow stops and snapshots the Sandbox, records the reason, and sends a
-   Web Push notification for completion, failure, timeout, or worker loss.
-   Manual cancellation deliberately does not notify.
+7. Workflow deletes the disposable user Sandbox without snapshotting it,
+   records the reason, and sends a Web Push notification for completion,
+   failure, timeout, or worker loss. Manual cancellation deliberately does not
+   notify.
 8. A 24-hour durable timeout performs the same cleanup if no callback arrives.
 
 ## Activity routing

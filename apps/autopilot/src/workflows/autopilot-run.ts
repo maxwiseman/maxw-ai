@@ -7,8 +7,8 @@ import { autopilotRun } from "@acme/db/schema";
 
 import type { AutopilotRunInput } from "~/server/autopilot-run";
 import {
+  deleteAutopilotSandbox,
   provisionAutopilotSandbox,
-  stopAutopilotSandbox,
 } from "~/server/autopilot-sandbox";
 import { sendAutopilotNotification } from "~/server/push-notifications";
 
@@ -27,7 +27,7 @@ async function callSandboxController(
   "use step";
 
   if (action === "provision") await provisionAutopilotSandbox(input);
-  else await stopAutopilotSandbox(input, finalStatus);
+  else await deleteAutopilotSandbox(input, finalStatus);
 }
 
 export const autopilotCompletionHook = defineHook({

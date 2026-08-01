@@ -2,7 +2,7 @@ import type { Sandbox } from "@vercel/sandbox";
 import { eq } from "drizzle-orm";
 
 import { db } from "@acme/db/client";
-import { autopilotRun } from "@acme/db/schema";
+import { autopilotRun, sandboxBaseSnapshot } from "@acme/db/schema";
 
 import type { AutopilotRunInput } from "~/server/autopilot-run";
 import { env } from "~/env";
@@ -13,8 +13,8 @@ const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
 const BASE_READY_PATH = "/vercel/sandbox/.autopilot/base-ready";
 const BASE_SANDBOX_NAME_PREFIX = "autopilot-base";
 // Hobby projects allow Sandbox sessions up to 45 minutes. Use a small margin
-// so this deployment works on every Vercel plan; named Sandbox persistence
-// still preserves the filesystem between sessions.
+// so this deployment works on every Vercel plan. The shared base Sandbox is
+// persistent, while each user Sandbox is deleted when its run finishes.
 const SANDBOX_TIMEOUT_MS = 44 * 60 * 1000;
 const SNAPSHOT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -156,10 +156,53 @@ async function isBaseSandboxReady(sandbox: Sandbox): Promise<boolean> {
   return result.exitCode === 0;
 }
 
+async function getStoredBaseSnapshotId(
+  revision: string,
+): Promise<string | undefined> {
+  const stored = await db.query.sandboxBaseSnapshot.findFirst({
+    where: eq(sandboxBaseSnapshot.revision, revision),
+  });
+
+  if (!stored) return;
+  const { APIError, Snapshot } = await import("@vercel/sandbox");
+  try {
+    const snapshot = await Snapshot.get({
+      ...getSandboxCredentials(),
+      snapshotId: stored.snapshotId,
+    });
+    if (snapshot.status === "created") return stored.snapshotId;
+  } catch (error) {
+    if (!(error instanceof APIError) || error.response.status !== 404) {
+      throw error;
+    }
+  }
+
+  await db
+    .delete(sandboxBaseSnapshot)
+    .where(eq(sandboxBaseSnapshot.revision, revision));
+}
+
+async function storeBaseSnapshotId(
+  revision: string,
+  snapshotId: string,
+): Promise<string> {
+  await db
+    .insert(sandboxBaseSnapshot)
+    .values({ revision, snapshotId })
+    .onConflictDoUpdate({
+      set: { snapshotId, updatedAt: new Date() },
+      target: sandboxBaseSnapshot.revision,
+    });
+  return snapshotId;
+}
+
 async function getBaseSnapshotId(): Promise<string> {
   const { Sandbox } = await import("@vercel/sandbox");
   const credentials = getSandboxCredentials();
   const name = getBaseSandboxName();
+  const existingSnapshotId = await getStoredBaseSnapshotId(name);
+  if (existingSnapshotId) return existingSnapshotId;
+
   const baseSandbox = await Sandbox.getOrCreate({
     ...credentials,
     keepLastSnapshots: { count: 1 },
@@ -173,7 +216,9 @@ async function getBaseSnapshotId(): Promise<string> {
     timeout: SANDBOX_TIMEOUT_MS,
   });
 
-  if (baseSandbox.currentSnapshotId) return baseSandbox.currentSnapshotId;
+  if (baseSandbox.currentSnapshotId) {
+    return storeBaseSnapshotId(name, baseSandbox.currentSnapshotId);
+  }
   if (!(await isBaseSandboxReady(baseSandbox))) {
     await bootstrapSandbox(baseSandbox);
   }
@@ -182,7 +227,7 @@ async function getBaseSnapshotId(): Promise<string> {
     const snapshot = await baseSandbox.snapshot({
       expiration: SNAPSHOT_EXPIRATION_MS,
     });
-    return snapshot.snapshotId;
+    return storeBaseSnapshotId(name, snapshot.snapshotId);
   } catch (error) {
     // Another concurrent provision may have snapshotted the shared base first.
     const refreshedBase = await Sandbox.get({
@@ -191,7 +236,7 @@ async function getBaseSnapshotId(): Promise<string> {
       resume: false,
     });
     if (refreshedBase.currentSnapshotId) {
-      return refreshedBase.currentSnapshotId;
+      return storeBaseSnapshotId(name, refreshedBase.currentSnapshotId);
     }
     throw error;
   }
@@ -243,12 +288,10 @@ export async function provisionAutopilotSandbox(
     const sandbox = await Sandbox.getOrCreate({
       ...getSandboxCredentials(),
       env: getSandboxEnvironment(input),
-      keepLastSnapshots: { count: 1 },
       name: input.sandboxName,
-      persistent: true,
+      persistent: false,
       ports: [SANDBOX_PORT],
       resources: { vcpus: env.AUTOPILOT_SANDBOX_VCPUS },
-      snapshotExpiration: SNAPSHOT_EXPIRATION_MS,
       source: { snapshotId: baseSnapshotId, type: "snapshot" },
       timeout: SANDBOX_TIMEOUT_MS,
     });
@@ -269,11 +312,11 @@ export async function provisionAutopilotSandbox(
   }
 }
 
-export async function stopAutopilotSandbox(
+export async function deleteAutopilotSandbox(
   input: AutopilotRunInput,
   finalStatus: "error" | "stopped" = "stopped",
 ): Promise<void> {
-  const { Sandbox } = await import("@vercel/sandbox");
+  const { APIError, Sandbox } = await import("@vercel/sandbox");
   let workerError: string | undefined;
   await db
     .update(autopilotRun)
@@ -296,9 +339,13 @@ export async function stopAutopilotSandbox(
         if (output) workerError = output.slice(-2_000);
       }
     }
-    if (sandbox.status !== "stopped") await sandbox.stop();
+    await sandbox.delete();
   } catch (error) {
-    console.warn("Sandbox was already unavailable during cleanup", error);
+    if (error instanceof APIError && error.response.status === 404) {
+      console.warn("Sandbox was already unavailable during cleanup", error);
+    } else {
+      throw error;
+    }
   } finally {
     await db
       .update(autopilotRun)
