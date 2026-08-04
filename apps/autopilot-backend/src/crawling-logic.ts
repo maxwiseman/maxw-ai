@@ -22,6 +22,7 @@ const SELECTORS = {
   DISPLAY_NAME: "#displayName",
   DUPLICATE_SESSION: ".duplicate-session-main-header",
   EMAIL_INPUT: 'input[type="email"]',
+  EXIT_AUDIO_BUTTON: "#btnExitAudio",
   FOOTNAV_RIGHT: ".footnav.goRight:not(.disabled)",
   FRAME_PROGRESS: "#frameProgress",
   FRAME_RIGHT: ".FrameRight",
@@ -37,6 +38,7 @@ const SELECTORS = {
 
 const TIMEOUTS = {
   AUTHENTICATION: 30_000,
+  ACTIVITY_ADVANCE: 20_000,
   DEFAULT: 10_000,
   DUPLICATE_SESSION: 3_000,
   NEXT_ACTIVITY: 5_000,
@@ -203,6 +205,7 @@ class EducationalPlatformAutomation {
       description: "Observing and completing this activity with AI",
     });
     const result = await runAgentActivity({
+      advanceActivity: () => this.advanceActivity(),
       activity,
       page: this.options.userPage,
       requestInput: this.options.requestInput,
@@ -218,6 +221,59 @@ class EducationalPlatformAutomation {
     );
     this.config = await this.loadUserConfig();
     return true;
+  }
+
+  private async advanceActivity(): Promise<"footnav" | "frame-right"> {
+    this.throwIfAborted();
+    try {
+      await waitAndClick(this.options.userPage, SELECTORS.FOOTNAV_RIGHT, {
+        timeout: 1_000,
+        visible: true,
+      });
+      return "footnav";
+    } catch {
+      // The activity may need to advance within #stageFrame first.
+    }
+    this.throwIfAborted();
+
+    const frameElement = await this.options.userPage.waitForSelector(
+      SELECTORS.STAGE_FRAME,
+    );
+    const activityFrame = await frameElement?.contentFrame();
+    if (!activityFrame) throw new Error("The activity frame was unavailable");
+
+    try {
+      await activityFrame.waitForFunction(
+        (frameRightSelector, exitAudioSelector) => {
+          const frameRight = document.querySelector(frameRightSelector);
+          if (!(frameRight instanceof HTMLElement)) return false;
+
+          const style = getComputedStyle(frameRight);
+          const isVisible =
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            frameRight.getClientRects().length > 0;
+          if (!isVisible) return false;
+
+          const exitAudioReady = Boolean(
+            document.querySelector(exitAudioSelector),
+          );
+          const frameRightIsPulsing = Number.parseFloat(style.opacity) < 1;
+          return exitAudioReady || frameRightIsPulsing;
+        },
+        { signal: this.options.signal, timeout: TIMEOUTS.ACTIVITY_ADVANCE },
+        SELECTORS.FRAME_RIGHT,
+        SELECTORS.EXIT_AUDIO_BUTTON,
+      );
+    } catch {
+      this.throwIfAborted();
+      throw new Error(
+        "The current activity is not ready to advance. Continue completing the current question or submit it before calling nextActivity again.",
+      );
+    }
+    this.throwIfAborted();
+    await activityFrame.click(SELECTORS.FRAME_RIGHT);
+    return "frame-right";
   }
 
   private async isVideo(frame: Frame): Promise<boolean> {

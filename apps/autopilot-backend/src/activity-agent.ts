@@ -1,13 +1,7 @@
-import type { ToolSet } from "ai";
+import type { StopCondition, ToolSet } from "ai";
 import type { Page } from "puppeteer";
 import { gateway } from "@ai-sdk/gateway";
-import {
-  hasToolCall,
-  pruneMessages,
-  stepCountIs,
-  tool,
-  ToolLoopAgent,
-} from "ai";
+import { pruneMessages, stepCountIs, tool, ToolLoopAgent } from "ai";
 import { z } from "zod";
 
 import type { ActivityMemory } from "@acme/db/schema";
@@ -22,6 +16,7 @@ const MAX_AGENT_TURNS = 3;
 
 interface AgentActivityConfig {
   activity: string;
+  advanceActivity: () => Promise<"footnav" | "frame-right">;
   page: Page;
   userId: string;
   signal?: AbortSignal;
@@ -173,11 +168,29 @@ export async function runAgentActivity(
         answer: await config.requestInput(question, options),
       }),
     }),
+    nextActivity: tool({
+      description:
+        "Advance after you have completed everything in the current activity frame. This safely handles Edgenuity's top-level foot navigation, end-of-activity audio, and FrameRight control. Never click FrameRight or the top-level next-activity control with click; call this tool instead. In-question navigation inside iFramePreview must still be clicked normally.",
+      inputSchema: z.object({
+        summary: z
+          .string()
+          .min(1)
+          .max(2_000)
+          .describe(
+            "A compact factual summary of answers or facts that may help with related future activities.",
+          ),
+      }),
+      execute: async ({ summary }) => {
+        const advancedWith = await config.advanceActivity();
+        finished = { outcome: "completed", summary };
+        return { advancedWith, outcome: "completed", summary };
+      },
+    }),
     finishActivity: tool({
       description:
-        "End this activity turn only after the activity is completed or deliberately skipped. Include a compact factual summary for related future activities.",
+        "Skip this activity deliberately when it cannot or should not be completed. Successful activities must end by calling nextActivity instead.",
       inputSchema: z.object({
-        outcome: z.enum(["completed", "skipped"]),
+        outcome: z.literal("skipped"),
         summary: z.string().min(1).max(2_000),
       }),
       execute: async (result) => {
@@ -187,11 +200,20 @@ export async function runAgentActivity(
     }),
   };
 
+  const hasSuccessfulCompletion: StopCondition<typeof tools> = ({ steps }) =>
+    steps.some((step) =>
+      step.toolResults.some(
+        (result) =>
+          result.toolName === "nextActivity" ||
+          result.toolName === "finishActivity",
+      ),
+    );
+
   const agent = new ToolLoopAgent<never, ToolSet, never>({
     model: gateway(process.env.AI_GATEWAY_MODEL ?? "openai/gpt-5.6-terra"),
     instructions: createInstructions(config),
     tools,
-    stopWhen: [stepCountIs(30), hasToolCall("finishActivity")],
+    stopWhen: [stepCountIs(30), hasSuccessfulCompletion],
     prepareStep: ({ messages }) => ({
       messages: pruneMessages({
         emptyMessages: "remove",
@@ -253,7 +275,7 @@ User preferences:
 Rolling context from recent activities:
 ${memory || "No prior activity context is available."}
 
-When the activity is actually complete or intentionally skipped, call finishActivity with a concise summary of facts or answers that may help with later related activities.`;
+Complete every question or task in iFramePreview before advancing. Controls inside iFramePreview may move between questions and should be clicked normally. Never click FrameRight or the top-level next-activity control with click. Once the current activity frame is fully complete, call nextActivity; it safely waits through end-of-activity audio, advances the page, and ends this agent turn so the crawler can detect videos or other special content. If the activity must be intentionally skipped, call finishActivity with outcome "skipped".`;
 }
 
 async function rememberActivity(

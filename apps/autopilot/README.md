@@ -90,6 +90,11 @@ tool-loop agent controlling the existing Chromium session through
 `agent-browser`. It can inspect nested frames, click or type, follow links, and
 open/switch/close research tabs. Settings become explicit agent constraints,
 including quiz/PDF completion, external research, and custom instructions.
+The agent advances with the terminal `nextActivity` tool instead of clicking
+Edgenuity's outer navigation itself. The tool prefers an enabled top-level
+footnav control, otherwise waits for end-of-activity audio or the pulsing
+`.FrameRight` readiness state before advancing within `#stageFrame`; the crawler
+then inspects the new frame again so videos remain deterministic.
 
 After each activity, the agent stores a compact summary. The six most recent
 summaries form a rolling context window for related follow-up activities; raw
