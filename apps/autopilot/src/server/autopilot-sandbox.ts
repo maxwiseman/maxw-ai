@@ -11,6 +11,8 @@ import { requiredWorkerSecret } from "~/server/autopilot-run";
 
 const SANDBOX_PORT = 8080;
 const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
+const WORKER_LOG_CAPTURE_CHARS = 8_000;
+const WORKER_LOG_TAIL_LINES = 200;
 const BASE_READY_PATH = "/vercel/sandbox/.autopilot/base-ready";
 const BASE_SANDBOX_NAME_PREFIX = "autopilot-base";
 const PUPPETEER_CACHE_DIR = "/vercel/sandbox/.cache/puppeteer";
@@ -364,12 +366,16 @@ export async function deleteAutopilotSandbox(
     });
     if (finalStatus === "error") {
       const logs = await sandbox.runCommand({
-        args: ["-n", "60", WORKER_LOG_PATH],
+        args: ["-n", String(WORKER_LOG_TAIL_LINES), WORKER_LOG_PATH],
         cmd: "tail",
       });
       if (logs.exitCode === 0) {
         const output = (await logs.stdout()).trim();
-        if (output) workerError = output.slice(-2_000);
+        if (output) {
+          workerError = `Worker diagnostic log before cleanup:\n${output.slice(
+            -WORKER_LOG_CAPTURE_CHARS,
+          )}`;
+        }
       }
     }
     await sandbox.delete();

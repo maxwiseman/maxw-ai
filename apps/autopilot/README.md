@@ -96,6 +96,20 @@ footnav control, otherwise waits for end-of-activity audio or the pulsing
 `.FrameRight` readiness state before advancing within `#stageFrame`; the crawler
 then inspects the new frame again so videos remain deterministic.
 
+The worker writes structured `autopilot-agent`, `autopilot-browser`, and
+`autopilot-crawler` events for generation turns, tool names and safe input
+metadata, browser command timing, tool errors, frame readiness, advancement
+decisions, video routing, durations, and token counts. It deliberately omits
+page snapshots, model text, entered answers, credentials, full URLs, and
+activity summaries. Failed or lost workers retain a labeled, bounded diagnostic
+tail in the run record before their Sandbox is deleted.
+
+The agent starts scoped to `#stageFrame`, so the nested `#iFramePreview`
+question is inlined alongside the activity controls without requiring another
+frame switch. It uses the controls exposed by each activity's own UI to answer,
+submit, retry, and move between questions, then calls `nextActivity` only after
+the activity is complete.
+
 After each activity, the agent stores a compact summary. The six most recent
 summaries form a rolling context window for related follow-up activities; raw
 browser transcripts and stale element references are not retained. If the

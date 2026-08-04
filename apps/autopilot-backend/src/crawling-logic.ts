@@ -44,6 +44,20 @@ const TIMEOUTS = {
   NEXT_ACTIVITY: 5_000,
 } as const;
 
+function logCrawlerEvent(
+  event: string,
+  details: Record<string, unknown> = {},
+): void {
+  console.log(
+    JSON.stringify({
+      event,
+      runId: process.env.AUTOPILOT_RUN_ID ?? "local",
+      scope: "autopilot-crawler",
+      ...details,
+    }),
+  );
+}
+
 interface AutomationConfig {
   userPage: Page;
   userId: string;
@@ -161,12 +175,15 @@ class EducationalPlatformAutomation {
 
   private async processActivity(): Promise<boolean> {
     this.throwIfAborted();
+    logCrawlerEvent("activity_processing_started");
     try {
       await waitAndClick(this.options.userPage, SELECTORS.FOOTNAV_RIGHT, {
         timeout: 1_000,
       });
+      logCrawlerEvent("initial_footnav_clicked");
     } catch {
       // The current activity may already be at the correct frame.
+      logCrawlerEvent("initial_footnav_unavailable");
     }
 
     const titleElement = await this.options.userPage
@@ -195,9 +212,11 @@ class EducationalPlatformAutomation {
 
     await this.logProgress(activityFrame);
     if (await this.isVideo(activityFrame)) {
+      logCrawlerEvent("activity_classified", { kind: "video" });
       await this.processVideo(activityFrame, status);
       return true;
     }
+    logCrawlerEvent("activity_classified", { kind: "agent" });
 
     if (!this.config) throw new Error("Configuration was not loaded");
     status.update("Starting browser agent", {
@@ -225,14 +244,17 @@ class EducationalPlatformAutomation {
 
   private async advanceActivity(): Promise<"footnav" | "frame-right"> {
     this.throwIfAborted();
+    logCrawlerEvent("advance_requested");
     try {
       await waitAndClick(this.options.userPage, SELECTORS.FOOTNAV_RIGHT, {
         timeout: 1_000,
         visible: true,
       });
+      logCrawlerEvent("advance_succeeded", { control: "footnav" });
       return "footnav";
     } catch {
       // The activity may need to advance within #stageFrame first.
+      logCrawlerEvent("advance_footnav_unavailable");
     }
     this.throwIfAborted();
 
@@ -242,6 +264,10 @@ class EducationalPlatformAutomation {
     const activityFrame = await frameElement?.contentFrame();
     if (!activityFrame) throw new Error("The activity frame was unavailable");
 
+    const readinessStartedAt = Date.now();
+    logCrawlerEvent("frame_right_wait_started", {
+      timeoutMs: TIMEOUTS.ACTIVITY_ADVANCE,
+    });
     try {
       await activityFrame.waitForFunction(
         (frameRightSelector, exitAudioSelector) => {
@@ -267,12 +293,27 @@ class EducationalPlatformAutomation {
       );
     } catch {
       this.throwIfAborted();
+      logCrawlerEvent("frame_right_wait_failed", {
+        durationMs: Date.now() - readinessStartedAt,
+      });
       throw new Error(
         "The current activity is not ready to advance. Continue completing the current question or submit it before calling nextActivity again.",
       );
     }
     this.throwIfAborted();
+    const readiness = await activityFrame.$eval(
+      SELECTORS.FRAME_RIGHT,
+      (frameRight) => ({
+        exitAudioPresent: Boolean(document.querySelector("#btnExitAudio")),
+        opacity: getComputedStyle(frameRight).opacity,
+      }),
+    );
+    logCrawlerEvent("frame_right_ready", {
+      durationMs: Date.now() - readinessStartedAt,
+      ...readiness,
+    });
     await activityFrame.click(SELECTORS.FRAME_RIGHT);
+    logCrawlerEvent("advance_succeeded", { control: "frame-right" });
     return "frame-right";
   }
 
@@ -295,7 +336,9 @@ class EducationalPlatformAutomation {
       description: "Waiting for the required video to finish",
     });
     await frame.waitForSelector(SELECTORS.VIDEO_PAUSE);
+    logCrawlerEvent("video_started");
     await frame.waitForSelector(SELECTORS.VIDEO_PLAY, { timeout: 0 });
+    logCrawlerEvent("video_finished");
     this.throwIfAborted();
     await sleep(500);
     await frame.click(SELECTORS.FRAME_RIGHT);
@@ -311,7 +354,7 @@ class EducationalPlatformAutomation {
         (element.textContent ?? "").trim(),
       )
       .catch(() => "");
-    if (progress) console.log(`Activity progress: ${progress}`);
+    if (progress) logCrawlerEvent("activity_progress", { progress });
   }
 
   private throwIfAborted(): void {

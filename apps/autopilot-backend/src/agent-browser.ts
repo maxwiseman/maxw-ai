@@ -31,6 +31,18 @@ export class AgentBrowserSession {
   private async execute(args: string[]): Promise<string> {
     if (this.signal?.aborted) throw new Error("Autopilot was stopped");
 
+    const command = args[0] ?? "unknown";
+    const startedAt = Date.now();
+    console.log(
+      JSON.stringify({
+        argumentCount: Math.max(0, args.length - 1),
+        command,
+        event: "command_started",
+        runId: process.env.AUTOPILOT_RUN_ID ?? "local",
+        scope: "autopilot-browser",
+      }),
+    );
+
     const processHandle = Bun.spawn(
       [
         "agent-browser",
@@ -69,10 +81,32 @@ export class AgentBrowserSession {
       ]);
       if (exitCode !== 0) {
         throw new Error(
-          `agent-browser ${args[0] ?? "command"} failed: ${stderr.trim() || stdout.trim() || `exit ${exitCode}`}`,
+          `agent-browser ${command} failed: ${stderr.trim() || stdout.trim() || `exit ${exitCode}`}`,
         );
       }
+      console.log(
+        JSON.stringify({
+          command,
+          durationMs: Date.now() - startedAt,
+          event: "command_finished",
+          outputLength: stdout.length,
+          runId: process.env.AUTOPILOT_RUN_ID ?? "local",
+          scope: "autopilot-browser",
+        }),
+      );
       return stdout.trim() || "Command completed successfully.";
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          command,
+          durationMs: Date.now() - startedAt,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          event: "command_failed",
+          runId: process.env.AUTOPILOT_RUN_ID ?? "local",
+          scope: "autopilot-browser",
+        }),
+      );
+      throw error;
     } finally {
       clearTimeout(timer);
       this.signal?.removeEventListener("abort", abort);
