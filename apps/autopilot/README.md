@@ -110,6 +110,11 @@ frame switch. It uses the controls exposed by each activity's own UI to answer,
 submit, retry, and move between questions, then calls `nextActivity` only after
 the activity is complete.
 
+Before entering `#stageFrame`, agent-browser lists the CDP browser's tabs and
+selects the single tab matching Puppeteer's activity page URL. If no unique tab
+matches, the worker stops with sanitized tab locations instead of operating on
+an arbitrary start page.
+
 After each activity, the agent stores a compact summary. The six most recent
 summaries form a rolling context window for related follow-up activities; raw
 browser transcripts and stale element references are not retained. If the

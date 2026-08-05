@@ -129,6 +129,7 @@ export async function runAgentActivity(
 
   const browser = new AgentBrowserSession(config.page, config.signal);
   const focusActivityFrame = async (): Promise<void> => {
+    await browser.focusPage();
     await browser.run(["frame", "main"]);
     await browser.run(["frame", "#stageFrame"]);
   };
