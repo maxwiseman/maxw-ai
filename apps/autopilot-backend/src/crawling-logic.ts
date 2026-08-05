@@ -6,8 +6,10 @@ import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { configuration } from "@acme/db/schema";
 
+import type { ActivityNavigationState } from "./activity-navigation";
 import type { WSServerMessageSchema } from "./message-schema";
 import { runAgentActivity } from "./activity-agent";
+import { didAdvanceActivity } from "./activity-navigation";
 import { createStatus } from "./status-update";
 import { waitAndClick, waitAndType } from "./utils";
 
@@ -39,6 +41,7 @@ const SELECTORS = {
 const TIMEOUTS = {
   AUTHENTICATION: 30_000,
   ACTIVITY_ADVANCE: 20_000,
+  ACTIVITY_TRANSITION: 10_000,
   DEFAULT: 10_000,
   DUPLICATE_SESSION: 3_000,
   NEXT_ACTIVITY: 5_000,
@@ -263,6 +266,7 @@ class EducationalPlatformAutomation {
     );
     const activityFrame = await frameElement?.contentFrame();
     if (!activityFrame) throw new Error("The activity frame was unavailable");
+    const before = await this.getActivityNavigationState(activityFrame);
 
     const readinessStartedAt = Date.now();
     logCrawlerEvent("frame_right_wait_started", {
@@ -281,9 +285,19 @@ class EducationalPlatformAutomation {
             frameRight.getClientRects().length > 0;
           if (!isVisible) return false;
 
-          const exitAudioReady = Boolean(
-            document.querySelector(exitAudioSelector),
-          );
+          const exitAudio = document.querySelector(exitAudioSelector);
+          const exitAudioStyle =
+            exitAudio instanceof HTMLElement
+              ? getComputedStyle(exitAudio)
+              : null;
+          const exitAudioReady =
+            exitAudio instanceof HTMLElement &&
+            !exitAudio.hidden &&
+            exitAudio.getAttribute("aria-hidden") !== "true" &&
+            exitAudioStyle?.display !== "none" &&
+            exitAudioStyle?.visibility !== "hidden" &&
+            Number.parseFloat(exitAudioStyle?.opacity ?? "1") > 0 &&
+            exitAudio.getClientRects().length > 0;
           const frameRightIsPulsing = Number.parseFloat(style.opacity) < 1;
           return exitAudioReady || frameRightIsPulsing;
         },
@@ -305,6 +319,19 @@ class EducationalPlatformAutomation {
       SELECTORS.FRAME_RIGHT,
       (frameRight) => ({
         exitAudioPresent: Boolean(document.querySelector("#btnExitAudio")),
+        exitAudioVisible: (() => {
+          const exitAudio = document.querySelector("#btnExitAudio");
+          if (!(exitAudio instanceof HTMLElement)) return false;
+          const style = getComputedStyle(exitAudio);
+          return (
+            !exitAudio.hidden &&
+            exitAudio.getAttribute("aria-hidden") !== "true" &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            Number.parseFloat(style.opacity) > 0 &&
+            exitAudio.getClientRects().length > 0
+          );
+        })(),
         opacity: getComputedStyle(frameRight).opacity,
       }),
     );
@@ -313,8 +340,56 @@ class EducationalPlatformAutomation {
       ...readiness,
     });
     await activityFrame.click(SELECTORS.FRAME_RIGHT);
+    const after = await this.waitForForwardActivityTransition(before);
     logCrawlerEvent("advance_succeeded", { control: "frame-right" });
+    logCrawlerEvent("activity_transition_verified", { before, after });
     return "frame-right";
+  }
+
+  private async getActivityNavigationState(
+    activityFrame?: Frame,
+  ): Promise<ActivityNavigationState> {
+    const frame =
+      activityFrame ??
+      (await this.options.userPage
+        .waitForSelector(SELECTORS.STAGE_FRAME)
+        .then((element) => element?.contentFrame()));
+    if (!frame) throw new Error("The activity frame was unavailable");
+
+    const progress = await frame
+      .$eval(SELECTORS.FRAME_PROGRESS, (element) =>
+        (element.textContent ?? "").trim(),
+      )
+      .catch(() => null);
+    const previewSource = await frame
+      .$eval(SELECTORS.IFRAME_PREVIEW, (element) =>
+        element instanceof HTMLIFrameElement
+          ? element.getAttribute("src")
+          : null,
+      )
+      .catch(() => null);
+    return { frameUrl: frame.url(), previewSource, progress };
+  }
+
+  private async waitForForwardActivityTransition(
+    before: ActivityNavigationState,
+  ): Promise<ActivityNavigationState> {
+    const startedAt = Date.now();
+    let last = before;
+    while (Date.now() - startedAt < TIMEOUTS.ACTIVITY_TRANSITION) {
+      this.throwIfAborted();
+      await sleep(250);
+      try {
+        last = await this.getActivityNavigationState();
+        if (didAdvanceActivity(before, last)) return last;
+      } catch {
+        // The stage frame can detach briefly while the next frame loads.
+      }
+    }
+    logCrawlerEvent("activity_transition_failed", { before, last });
+    throw new Error(
+      `The activity did not move forward after FrameRight was clicked (before: ${before.progress ?? "unknown"}; after: ${last.progress ?? "unknown"}). Observe the current frame and continue from there.`,
+    );
   }
 
   private async isVideo(frame: Frame): Promise<boolean> {
@@ -341,7 +416,11 @@ class EducationalPlatformAutomation {
     logCrawlerEvent("video_finished");
     this.throwIfAborted();
     await sleep(500);
+    const before = await this.getActivityNavigationState(frame);
     await frame.click(SELECTORS.FRAME_RIGHT);
+    const after = await this.waitForForwardActivityTransition(before);
+    logCrawlerEvent("advance_succeeded", { control: "video-frame-right" });
+    logCrawlerEvent("activity_transition_verified", { before, after });
     status.update("Video completed", {
       type: "success",
       description: "Moving to the next activity",

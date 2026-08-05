@@ -92,9 +92,12 @@ open/switch/close research tabs. Settings become explicit agent constraints,
 including quiz/PDF completion, external research, and custom instructions.
 The agent advances with the terminal `nextActivity` tool instead of clicking
 Edgenuity's outer navigation itself. The tool prefers an enabled top-level
-footnav control, otherwise waits for end-of-activity audio or the pulsing
-`.FrameRight` readiness state before advancing within `#stageFrame`; the crawler
-then inspects the new frame again so videos remain deterministic.
+footnav control, otherwise waits for visible end-of-activity audio or the
+pulsing `.FrameRight` readiness state before advancing within `#stageFrame`.
+It verifies that frame progress moved forward before reporting success; the
+crawler then inspects the new frame again so videos remain deterministic.
+The deterministic video path performs the same forward-transition check after
+the required video finishes.
 
 The worker writes structured `autopilot-agent`, `autopilot-browser`, and
 `autopilot-crawler` events for generation turns, tool names and safe input
@@ -104,11 +107,12 @@ page snapshots, model text, entered answers, credentials, full URLs, and
 activity summaries. Failed or lost workers retain a labeled, bounded diagnostic
 tail in the run record before their Sandbox is deleted.
 
-The agent starts scoped to `#stageFrame`, so the nested `#iFramePreview`
-question is inlined alongside the activity controls without requiring another
-frame switch. It uses the controls exposed by each activity's own UI to answer,
-submit, retry, and move between questions, then calls `nextActivity` only after
-the activity is complete.
+The agent starts scoped to `#stageFrame`. Agent-browser inlines one nested iframe
+level alongside the activity controls. If an activity contains another iframe,
+the agent can enter that boundary one level at a time, inspect and complete its
+UI, then restore `#stageFrame` before advancing. It uses the controls exposed by
+each activity's own UI to answer, submit, retry, and move between questions,
+then calls `nextActivity` only after the activity is complete.
 
 Before entering `#stageFrame`, agent-browser lists the CDP browser's tabs and
 selects the single tab matching Puppeteer's activity page URL. If no unique tab
