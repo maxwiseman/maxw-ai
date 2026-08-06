@@ -91,13 +91,11 @@ function getBaseSandboxName(): string {
 }
 
 function getSandboxEnvironment(input: AutopilotRunInput) {
-  if (!env.AI_GATEWAY_API_KEY) {
-    throw new Error("AI_GATEWAY_API_KEY must be configured");
+  if (!env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY must be configured");
   }
 
   return {
-    AI_GATEWAY_API_KEY: env.AI_GATEWAY_API_KEY,
-    AI_GATEWAY_MODEL: env.AI_GATEWAY_MODEL,
     AUTH_SECRET: env.AUTH_SECRET ?? "",
     AUTOPILOT_RUN_CALLBACK_URL: `${input.controlUrl}/api/autopilot/run/complete`,
     AUTOPILOT_RUN_ID: input.runId,
@@ -106,6 +104,8 @@ function getSandboxEnvironment(input: AutopilotRunInput) {
     DATABASE_AUTH_TOKEN: env.DATABASE_AUTH_TOKEN,
     DATABASE_URL: env.DATABASE_URL,
     NODE_ENV: "production",
+    OPENAI_API_KEY: env.OPENAI_API_KEY,
+    OPENAI_COMPUTER_MODEL: env.OPENAI_COMPUTER_MODEL,
     PORT: String(SANDBOX_PORT),
     PUPPETEER_CACHE_DIR,
   };

@@ -18,8 +18,8 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
     DATABASE_AUTH_TOKEN: z.string(),
-    AI_GATEWAY_API_KEY: z.string().min(1).optional(),
-    AI_GATEWAY_MODEL: z.string().min(1).default("openai/gpt-5.6-terra"),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_COMPUTER_MODEL: z.string().min(1).default("gpt-5.6-terra"),
     AUTOPILOT_WORKER_SECRET: z.string().min(32).optional(),
     AUTOPILOT_SANDBOX_REPO_URL: z
       .string()

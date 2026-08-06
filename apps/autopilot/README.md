@@ -2,8 +2,8 @@
 
 Autopilot runs its Next.js control plane on Vercel and creates one named,
 persistent Vercel Sandbox for each active automation run. Chromium, Puppeteer,
-Vercel's `agent-browser`, the WebSocket server, and the MJPEG preview all run
-inside that Sandbox.
+the Responses API computer agent, the WebSocket server, and the MJPEG preview
+all run inside that Sandbox.
 
 ## Why Workflow and Sandbox are separate
 
@@ -32,8 +32,8 @@ Autopilot run rather than pretending the browser session was recoverable.
    Sandbox duration limit.
 2. Set these project environment variables:
    - `AUTOPILOT_WORKER_SECRET` (at least 32 random characters)
-   - `AI_GATEWAY_API_KEY` (a long-lived AI Gateway key for the Sandbox)
-   - `AI_GATEWAY_MODEL` (defaults to `openai/gpt-5.6-terra`)
+   - `OPENAI_API_KEY` (used by the Sandbox's Responses API computer agent)
+   - `OPENAI_COMPUTER_MODEL` (defaults to `gpt-5.6-terra`)
    - `DATABASE_URL`
    - `DATABASE_AUTH_TOKEN`
    - `AUTH_SECRET`
@@ -85,39 +85,35 @@ available, or set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`.
 ## Activity routing
 
 Microsoft sign-in and required video playback remain deterministic Puppeteer
-automations and do not call a model. Every other activity is given to an AI SDK
-tool-loop agent controlling the existing Chromium session through
-`agent-browser`. It can inspect nested frames, click or type, follow links, and
-open/switch/close research tabs. Settings become explicit agent constraints,
-including quiz/PDF completion, external research, and custom instructions.
-The agent advances with the terminal `nextActivity` tool instead of clicking
-Edgenuity's outer navigation itself. The tool prefers an enabled top-level
+automations and do not call a model. Every other activity is given to an OpenAI
+Responses API computer agent controlling the existing Chromium session through
+screenshots and coordinate-based actions. Because it sees the rendered page,
+nested iframe boundaries do not need special browser scoping. Settings become
+explicit agent constraints, including quiz/PDF completion, external research,
+and custom instructions. The agent advances with the terminal `next_activity`
+tool instead of clicking Edgenuity's outer navigation itself. The tool prefers
+an enabled top-level
 footnav control, otherwise waits for visible end-of-activity audio or the
 pulsing `.FrameRight` readiness state before advancing within `#stageFrame`.
 It verifies that frame progress moved forward before reporting success; the
-crawler then inspects the new frame again so videos remain deterministic.
+crawler then classifies the new frame before invoking another agent, so videos
+remain deterministic and are never handed to the model.
 The deterministic video path performs the same forward-transition check after
 the required video finishes.
 
-The worker writes structured `autopilot-agent`, `autopilot-browser`, and
+The worker writes structured `autopilot-computer-agent` and
 `autopilot-crawler` events for generation turns, tool names and safe input
-metadata, browser command timing, tool errors, frame readiness, advancement
+metadata, computer action types, tool errors, frame readiness, advancement
 decisions, video routing, durations, and token counts. It deliberately omits
-page snapshots, model text, entered answers, credentials, full URLs, and
-activity summaries. Failed or lost workers retain a labeled, bounded diagnostic
-tail in the run record before their Sandbox is deleted.
+screenshots, model text, entered answers, credentials, full URLs, and activity
+summaries. Failed or lost workers retain a labeled, bounded diagnostic tail in
+the run record before their Sandbox is deleted.
 
-The agent starts scoped to `#stageFrame`. Agent-browser inlines one nested iframe
-level alongside the activity controls. If an activity contains another iframe,
-the agent can enter that boundary one level at a time, inspect and complete its
-UI, then restore `#stageFrame` before advancing. It uses the controls exposed by
-each activity's own UI to answer, submit, retry, and move between questions,
-then calls `nextActivity` only after the activity is complete.
-
-Before entering `#stageFrame`, agent-browser lists the CDP browser's tabs and
-selects the single tab matching Puppeteer's activity page URL. If no unique tab
-matches, the worker stops with sanitized tab locations instead of operating on
-an arbitrary start page.
+The model uses each activity's own visible controls to answer, submit, retry,
+and move between internal questions. It is prohibited from clicking the outer
+Go Left, Go Right, FrameLeft, FrameRight, or frame-number controls and calls
+`next_activity` only after the activity is complete. The deterministic tool
+then owns outer navigation and verifies a forward transition.
 
 After each activity, the agent stores a compact summary. The six most recent
 summaries form a rolling context window for related follow-up activities; raw
