@@ -248,17 +248,9 @@ class EducationalPlatformAutomation {
   private async advanceActivity(): Promise<"footnav" | "frame-right"> {
     this.throwIfAborted();
     logCrawlerEvent("advance_requested");
-    try {
-      await waitAndClick(this.options.userPage, SELECTORS.FOOTNAV_RIGHT, {
-        timeout: 1_000,
-        visible: true,
-      });
-      logCrawlerEvent("advance_succeeded", { control: "footnav" });
-      return "footnav";
-    } catch {
-      // The activity may need to advance within #stageFrame first.
-      logCrawlerEvent("advance_footnav_unavailable");
-    }
+    if (await this.tryAdvanceFootnav()) return "footnav";
+    // The activity may need to advance within #stageFrame first.
+    logCrawlerEvent("advance_footnav_unavailable");
     this.throwIfAborted();
 
     const frameElement = await this.options.userPage.waitForSelector(
@@ -310,6 +302,10 @@ class EducationalPlatformAutomation {
       logCrawlerEvent("frame_right_wait_failed", {
         durationMs: Date.now() - readinessStartedAt,
       });
+      if (await this.tryAdvanceFootnav()) {
+        logCrawlerEvent("advance_recovered", { control: "footnav" });
+        return "footnav";
+      }
       throw new Error(
         "The current activity is not ready to advance. Re-enter the question-content iframe and finish its remaining question or submission step. Do not click Go Left, Go Right, FrameLeft, FrameRight, or a Frame-number link; call nextActivity again only after the whole activity is complete.",
       );
@@ -344,6 +340,19 @@ class EducationalPlatformAutomation {
     logCrawlerEvent("advance_succeeded", { control: "frame-right" });
     logCrawlerEvent("activity_transition_verified", { before, after });
     return "frame-right";
+  }
+
+  private async tryAdvanceFootnav(): Promise<boolean> {
+    try {
+      await waitAndClick(this.options.userPage, SELECTORS.FOOTNAV_RIGHT, {
+        timeout: 1_000,
+        visible: true,
+      });
+      logCrawlerEvent("advance_succeeded", { control: "footnav" });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async getActivityNavigationState(
@@ -416,11 +425,7 @@ class EducationalPlatformAutomation {
     logCrawlerEvent("video_finished");
     this.throwIfAborted();
     await sleep(500);
-    const before = await this.getActivityNavigationState(frame);
-    await frame.click(SELECTORS.FRAME_RIGHT);
-    const after = await this.waitForForwardActivityTransition(before);
-    logCrawlerEvent("advance_succeeded", { control: "video-frame-right" });
-    logCrawlerEvent("activity_transition_verified", { before, after });
+    await this.advanceActivity();
     status.update("Video completed", {
       type: "success",
       description: "Moving to the next activity",
