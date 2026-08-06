@@ -200,6 +200,65 @@ async function storeBaseSnapshotId(
   return snapshotId;
 }
 
+async function cleanupOldBaseArtifacts(
+  keepSnapshotIds: ReadonlySet<string>,
+): Promise<void> {
+  const { APIError, Sandbox, Snapshot } = await import("@vercel/sandbox");
+  const storedSnapshots = await db.select().from(sandboxBaseSnapshot);
+
+  for (const stored of storedSnapshots) {
+    if (keepSnapshotIds.has(stored.snapshotId)) continue;
+
+    try {
+      const snapshot = await Snapshot.get({
+        ...getSandboxCredentials(),
+        snapshotId: stored.snapshotId,
+      });
+      if (snapshot.status !== "deleted") await snapshot.delete();
+    } catch (error) {
+      if (!(error instanceof APIError) || error.response.status !== 404) {
+        throw error;
+      }
+    }
+
+    try {
+      const baseSandbox = await Sandbox.get({
+        ...getSandboxCredentials(),
+        name: stored.revision,
+        resume: false,
+      });
+      await baseSandbox.delete();
+    } catch (error) {
+      if (!(error instanceof APIError) || error.response.status !== 404) {
+        console.warn("Could not delete retired base Sandbox", {
+          error,
+          name: stored.revision,
+        });
+      }
+    }
+
+    await db
+      .delete(sandboxBaseSnapshot)
+      .where(eq(sandboxBaseSnapshot.revision, stored.revision));
+    console.log(
+      JSON.stringify({
+        event: "retired_base_artifact_deleted",
+        sandboxName: stored.revision,
+        snapshotId: stored.snapshotId,
+      }),
+    );
+  }
+}
+
+async function finalizeBaseSnapshot(
+  revision: string,
+  snapshotId: string,
+): Promise<string> {
+  await storeBaseSnapshotId(revision, snapshotId);
+  await cleanupOldBaseArtifacts(new Set([snapshotId]));
+  return snapshotId;
+}
+
 async function setProvisioningStage(
   runId: string,
   provisioningStage: AutopilotRunProvisioningStage,
@@ -217,15 +276,29 @@ async function getBaseSnapshotId(runId: string): Promise<string> {
   await setProvisioningStage(runId, "preparing_environment");
   const existingSnapshotId = await getStoredBaseSnapshotId(name);
   if (existingSnapshotId) {
+    await cleanupOldBaseArtifacts(new Set([existingSnapshotId]));
     await setProvisioningStage(runId, "restoring_snapshot");
     return existingSnapshotId;
   }
+
+  const newestStoredSnapshot = (
+    await db.select().from(sandboxBaseSnapshot)
+  ).sort(
+    (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
+  )[0];
+  await cleanupOldBaseArtifacts(
+    new Set(newestStoredSnapshot ? [newestStoredSnapshot.snapshotId] : []),
+  );
 
   await setProvisioningStage(runId, "installing_dependencies");
   const baseSandbox = await Sandbox.getOrCreate({
     ...credentials,
     env: { PUPPETEER_CACHE_DIR },
-    keepLastSnapshots: { count: 1 },
+    keepLastSnapshots: {
+      count: 1,
+      deleteEvicted: true,
+      expiration: SNAPSHOT_EXPIRATION_MS,
+    },
     name,
     onCreate: bootstrapSandbox,
     persistent: true,
@@ -237,7 +310,7 @@ async function getBaseSnapshotId(runId: string): Promise<string> {
   });
 
   if (baseSandbox.currentSnapshotId) {
-    return storeBaseSnapshotId(name, baseSandbox.currentSnapshotId);
+    return finalizeBaseSnapshot(name, baseSandbox.currentSnapshotId);
   }
   if (!(await isBaseSandboxReady(baseSandbox))) {
     await bootstrapSandbox(baseSandbox);
@@ -247,7 +320,9 @@ async function getBaseSnapshotId(runId: string): Promise<string> {
     const snapshot = await baseSandbox.snapshot({
       expiration: SNAPSHOT_EXPIRATION_MS,
     });
-    return storeBaseSnapshotId(name, snapshot.snapshotId);
+    // snapshot() stops the source VM. Do not delete this named Sandbox here:
+    // Vercel would also delete the snapshot that user Sandboxes restore from.
+    return finalizeBaseSnapshot(name, snapshot.snapshotId);
   } catch (error) {
     // Another concurrent provision may have snapshotted the shared base first.
     const refreshedBase = await Sandbox.get({
@@ -256,7 +331,7 @@ async function getBaseSnapshotId(runId: string): Promise<string> {
       resume: false,
     });
     if (refreshedBase.currentSnapshotId) {
-      return storeBaseSnapshotId(name, refreshedBase.currentSnapshotId);
+      return finalizeBaseSnapshot(name, refreshedBase.currentSnapshotId);
     }
     throw error;
   }
