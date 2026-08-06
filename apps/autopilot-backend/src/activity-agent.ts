@@ -248,8 +248,7 @@ async function continueComputerCall(
   response: Response,
   call: ResponseComputerToolCall,
 ): Promise<Response> {
-  const acknowledgedSafetyChecks = await confirmSafetyChecks(config, call);
-  const actions = call.actions ?? (call.action ? [call.action] : []);
+  const actions = call.actions ?? [];
   logAgentEvent("computer_actions_started", {
     actionCount: actions.length,
     actionTypes: actions.map((action) => action.type),
@@ -262,14 +261,15 @@ async function continueComputerCall(
     responseId: response.id,
   });
 
+  const output = {
+    detail: "original" as const,
+    image_url: imageUrl,
+    type: "computer_screenshot" as const,
+  };
   const input: ResponseInputItem[] = [
     {
-      acknowledged_safety_checks: acknowledgedSafetyChecks,
       call_id: call.call_id,
-      output: {
-        image_url: imageUrl,
-        type: "computer_screenshot",
-      },
+      output,
       type: "computer_call_output",
     },
   ];
@@ -283,31 +283,6 @@ async function continueComputerCall(
     },
     { signal: config.signal },
   );
-}
-
-async function confirmSafetyChecks(
-  config: AgentActivityConfig,
-  call: ResponseComputerToolCall,
-): Promise<{ id: string; code?: string | null; message?: string | null }[]> {
-  if (call.pending_safety_checks.length === 0) return [];
-  const description = call.pending_safety_checks
-    .map((check) => check.message ?? check.code ?? check.id)
-    .join("; ");
-  logAgentEvent("safety_confirmation_requested", {
-    checkCount: call.pending_safety_checks.length,
-  });
-  const answer = await config.requestInput(
-    `OpenAI paused before a potentially sensitive browser action: ${description}. Continue?`,
-    ["Continue", "Stop"],
-  );
-  if (!/^continue$/i.test(answer.trim())) {
-    throw new Error("The user declined the computer-use safety confirmation");
-  }
-  return call.pending_safety_checks.map((check) => ({
-    code: check.code,
-    id: check.id,
-    message: check.message,
-  }));
 }
 
 async function executeFunctionCall(
@@ -385,7 +360,7 @@ async function executeComputerActions(
         });
         break;
       case "drag": {
-        const [start, ...rest] = action.path;
+        const [start, ...rest] = normalizeDragPath(action.path);
         if (!start || rest.length === 0) {
           throw new Error("Computer drag requires at least two points");
         }
@@ -502,11 +477,37 @@ function normalizeKey(key: string): KeyInput {
 }
 
 function normalizeMouseButton(
-  button: "back" | "forward" | "left" | "right" | "wheel",
+  button?: "back" | "forward" | "left" | "right" | "wheel",
 ): "left" | "middle" | "right" {
+  if (!button) return "left";
   if (button === "left" || button === "right") return button;
   if (button === "wheel") return "middle";
   throw new Error(`Unsupported browser mouse button: ${button}`);
+}
+
+function normalizeDragPath(path: unknown): { x: number; y: number }[] {
+  if (!Array.isArray(path)) {
+    throw new Error("Computer drag requires a path array");
+  }
+  return (path as unknown[]).map((point) => {
+    if (
+      Array.isArray(point) &&
+      point.length >= 2 &&
+      typeof point[0] === "number" &&
+      typeof point[1] === "number"
+    ) {
+      return { x: point[0], y: point[1] };
+    }
+    if (point && typeof point === "object") {
+      const record = point as Record<string, unknown>;
+      if (typeof record.x === "number" && typeof record.y === "number") {
+        return { x: record.x, y: record.y };
+      }
+    }
+    throw new Error(
+      "Computer drag path entries must be coordinate pairs or {x, y} objects",
+    );
+  });
 }
 
 function logResponse(response: Response, turn: number): void {
