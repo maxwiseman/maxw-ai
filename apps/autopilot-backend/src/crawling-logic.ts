@@ -311,7 +311,7 @@ class EducationalPlatformAutomation {
         durationMs: Date.now() - readinessStartedAt,
       });
       throw new Error(
-        "The current activity is not ready to advance. Continue completing the current question or submit it before calling nextActivity again.",
+        "The current activity is not ready to advance. Re-enter the question-content iframe and finish its remaining question or submission step. Do not click Go Left, Go Right, FrameLeft, FrameRight, or a Frame-number link; call nextActivity again only after the whole activity is complete.",
       );
     }
     this.throwIfAborted();
