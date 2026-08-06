@@ -235,6 +235,20 @@ class EducationalPlatformAutomation {
       signal: this.options.signal,
       userId: this.options.userId,
     });
+    if (result.outcome === "video") {
+      logCrawlerEvent("video_handoff_requested");
+      if (await this.isVideo(activityFrame)) {
+        logCrawlerEvent("video_handoff_confirmed");
+        await this.processVideo(activityFrame, status);
+      } else {
+        logCrawlerEvent("video_handoff_rejected");
+        status.update("Retrying browser agent", {
+          type: "pending",
+          description: "The reported video was not detected",
+        });
+      }
+      return true;
+    }
     status.update(
       result.outcome === "completed"
         ? "Activity completed"
@@ -307,7 +321,7 @@ class EducationalPlatformAutomation {
         return "footnav";
       }
       throw new Error(
-        "The current activity is not ready to advance. Re-enter the question-content iframe and finish its remaining question or submission step. Do not click Go Left, Go Right, FrameLeft, FrameRight, or a Frame-number link; call nextActivity again only after the whole activity is complete.",
+        "The current slide is not ready to advance. Re-enter the question-content iframe and finish its remaining question or submission step. Do not click Go Left, Go Right, FrameLeft, FrameRight, or a Frame-number link; call next_slide again only after all work in the white content area is complete.",
       );
     }
     this.throwIfAborted();

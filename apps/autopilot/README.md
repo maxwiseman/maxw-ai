@@ -90,7 +90,7 @@ Responses API computer agent controlling the existing Chromium session through
 screenshots and coordinate-based actions. Because it sees the rendered page,
 nested iframe boundaries do not need special browser scoping. Settings become
 explicit agent constraints, including quiz/PDF completion, external research,
-and custom instructions. The agent advances with the terminal `next_activity`
+and custom instructions. The agent advances with the terminal `next_slide`
 tool instead of clicking Edgenuity's outer navigation itself. The tool prefers
 an enabled top-level
 footnav control, otherwise waits for visible end-of-activity audio or the
@@ -100,6 +100,11 @@ crawler then classifies the new frame before invoking another agent, so videos
 remain deterministic and are never handed to the model.
 The deterministic video path performs the same forward-transition check after
 the required video finishes.
+If a video reaches the computer agent because classification raced with the
+page, the model immediately calls the terminal `skip_video` tool. The crawler
+rechecks the live frame and, when confirmed, resumes the same deterministic
+video path without letting the model operate playback or spend turns watching
+screenshots. A false-positive handoff is rejected and reclassified safely.
 
 The worker writes structured `autopilot-computer-agent` and
 `autopilot-crawler` events for generation turns, tool names and safe input
@@ -112,7 +117,8 @@ the run record before their Sandbox is deleted.
 The model uses each activity's own visible controls to answer, submit, retry,
 and move between internal questions. It is prohibited from clicking the outer
 Go Left, Go Right, FrameLeft, FrameRight, or frame-number controls and calls
-`next_activity` only after the activity is complete. The deterministic tool
+`next_slide` only after the white slide content is complete, including on the
+last slide. The deterministic tool
 then owns outer navigation and verifies a forward transition.
 
 After each activity, the agent stores a compact summary. The six most recent
