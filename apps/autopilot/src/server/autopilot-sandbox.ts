@@ -14,13 +14,25 @@ const WORKER_LOG_PATH = "/vercel/sandbox/.autopilot/worker.log";
 const WORKER_LOG_CAPTURE_CHARS = 8_000;
 const WORKER_LOG_TAIL_LINES = 200;
 const BASE_READY_PATH = "/vercel/sandbox/.autopilot/base-ready";
-const BASE_SANDBOX_NAME_PREFIX = "autopilot-base";
+const BASE_SANDBOX_NAME_PREFIX = "autopilot-base2";
 const PUPPETEER_CACHE_DIR = "/vercel/sandbox/.cache/puppeteer";
 // Hobby projects allow Sandbox sessions up to 45 minutes. Use a small margin
 // so this deployment works on every Vercel plan. The shared base Sandbox is
 // persistent, while each user Sandbox is deleted when its run finishes.
 const SANDBOX_TIMEOUT_MS = 44 * 60 * 1000;
 const SNAPSHOT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
+const BROWSER_SMOKE_TEST_SCRIPT = `
+  import puppeteer from "puppeteer";
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true,
+  });
+  try {
+    console.log(await browser.version());
+  } finally {
+    await browser.close();
+  }
+`;
 
 function hasMissingSnapshotStatus(error: APIError<unknown>): boolean {
   return error.response.status === 404 || error.response.status === 410;
@@ -127,6 +139,26 @@ async function assertCommandSucceeded(
   }
 }
 
+async function installAndVerifyBrowser(
+  sandbox: Sandbox,
+  replaceExisting = false,
+): Promise<void> {
+  if (replaceExisting) {
+    await assertCommandSucceeded(sandbox, {
+      args: ["-rf", `${PUPPETEER_CACHE_DIR}/chrome`],
+      cmd: "rm",
+    });
+  }
+  await assertCommandSucceeded(sandbox, {
+    args: ["puppeteer", "browsers", "install", "chrome"],
+    cmd: "bunx",
+  });
+  await assertCommandSucceeded(sandbox, {
+    args: ["-e", BROWSER_SMOKE_TEST_SCRIPT],
+    cmd: "bun",
+  });
+}
+
 async function bootstrapSandbox(sandbox: Sandbox): Promise<void> {
   await assertCommandSucceeded(sandbox, {
     args: ["install", "-y", ...CHROMIUM_SYSTEM_DEPS],
@@ -142,10 +174,7 @@ async function bootstrapSandbox(sandbox: Sandbox): Promise<void> {
     args: ["install", "--frozen-lockfile"],
     cmd: "bun",
   });
-  await assertCommandSucceeded(sandbox, {
-    args: ["puppeteer", "browsers", "install", "chrome"],
-    cmd: "bunx",
-  });
+  await installAndVerifyBrowser(sandbox);
   await assertCommandSucceeded(sandbox, {
     args: ["-p", "/vercel/sandbox/.autopilot"],
     cmd: "mkdir",
@@ -395,6 +424,13 @@ async function startWorker(sandbox: Sandbox): Promise<string> {
   );
 }
 
+function isCorruptBrowserInstallation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("Error loading V8 startup snapshot file")
+  );
+}
+
 export async function provisionAutopilotSandbox(
   input: AutopilotRunInput,
 ): Promise<{ workerUrl: string }> {
@@ -438,7 +474,21 @@ export async function provisionAutopilotSandbox(
       sandbox = await createSandbox(baseSnapshotId);
     }
     await setProvisioningStage(input.runId, "starting_worker");
-    const workerUrl = await startWorker(sandbox);
+    let workerUrl: string;
+    try {
+      workerUrl = await startWorker(sandbox);
+    } catch (error) {
+      if (!isCorruptBrowserInstallation(error)) throw error;
+
+      console.warn(
+        "Restored Chrome installation was corrupt; reinstalling in the user Sandbox",
+        { snapshotId: baseSnapshotId },
+      );
+      await setProvisioningStage(input.runId, "installing_dependencies");
+      await installAndVerifyBrowser(sandbox, true);
+      await setProvisioningStage(input.runId, "starting_worker");
+      workerUrl = await startWorker(sandbox);
+    }
     await db
       .update(autopilotRun)
       .set({
