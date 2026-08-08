@@ -516,7 +516,7 @@ export async function deleteAutopilotSandbox(
   finalStatus: "error" | "stopped" = "stopped",
 ): Promise<void> {
   const { APIError, Sandbox } = await import("@vercel/sandbox");
-  let workerError: string | undefined;
+  let sandboxLogTail: string | undefined;
   await db
     .update(autopilotRun)
     .set({ status: "stopping" })
@@ -536,9 +536,7 @@ export async function deleteAutopilotSandbox(
       if (logs.exitCode === 0) {
         const output = (await logs.stdout()).trim();
         if (output) {
-          workerError = `Worker diagnostic log before cleanup:\n${output.slice(
-            -WORKER_LOG_CAPTURE_CHARS,
-          )}`;
+          sandboxLogTail = output.slice(-WORKER_LOG_CAPTURE_CHARS);
         }
       }
     }
@@ -553,7 +551,7 @@ export async function deleteAutopilotSandbox(
     await db
       .update(autopilotRun)
       .set({
-        ...(workerError ? { lastError: workerError } : {}),
+        ...(sandboxLogTail ? { sandboxLogTail } : {}),
         provisioningStage: null,
         status: finalStatus,
         workerUrl: null,

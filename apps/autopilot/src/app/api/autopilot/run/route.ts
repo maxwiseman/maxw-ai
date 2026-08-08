@@ -85,6 +85,7 @@ export async function POST() {
       set: {
         id: input.runId,
         lastError: null,
+        sandboxLogTail: null,
         sandboxName: input.sandboxName,
         status: "provisioning",
         lastHeartbeatAt: null,

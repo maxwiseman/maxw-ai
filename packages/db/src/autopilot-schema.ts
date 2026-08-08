@@ -125,6 +125,7 @@ export const autopilotRun = sqliteTable(
       enum: autopilotRunProvisioningStages,
     }),
     lastError: text("last_error"),
+    sandboxLogTail: text("sandbox_log_tail"),
     lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp" }),
     stopReason: text("stop_reason", { enum: autopilotRunStopReasons }),
     notificationSentAt: integer("notification_sent_at", {
