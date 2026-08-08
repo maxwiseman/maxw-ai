@@ -1,5 +1,5 @@
-import type { Sandbox } from "@vercel/sandbox";
-import { eq } from "drizzle-orm";
+import type { APIError, Sandbox } from "@vercel/sandbox";
+import { and, eq } from "drizzle-orm";
 
 import type { AutopilotRunProvisioningStage } from "@acme/db/schema";
 import { db } from "@acme/db/client";
@@ -21,6 +21,10 @@ const PUPPETEER_CACHE_DIR = "/vercel/sandbox/.cache/puppeteer";
 // persistent, while each user Sandbox is deleted when its run finishes.
 const SANDBOX_TIMEOUT_MS = 44 * 60 * 1000;
 const SNAPSHOT_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
+
+function hasMissingSnapshotStatus(error: APIError<unknown>): boolean {
+  return error.response.status === 404 || error.response.status === 410;
+}
 
 const CHROMIUM_SYSTEM_DEPS = [
   "nss",
@@ -176,14 +180,19 @@ async function getStoredBaseSnapshotId(
     });
     if (snapshot.status === "created") return stored.snapshotId;
   } catch (error) {
-    if (!(error instanceof APIError) || error.response.status !== 404) {
+    if (!(error instanceof APIError) || !hasMissingSnapshotStatus(error)) {
       throw error;
     }
   }
 
   await db
     .delete(sandboxBaseSnapshot)
-    .where(eq(sandboxBaseSnapshot.revision, revision));
+    .where(
+      and(
+        eq(sandboxBaseSnapshot.revision, revision),
+        eq(sandboxBaseSnapshot.snapshotId, stored.snapshotId),
+      ),
+    );
 }
 
 async function storeBaseSnapshotId(
@@ -216,7 +225,7 @@ async function cleanupOldBaseArtifacts(
       });
       if (snapshot.status !== "deleted") await snapshot.delete();
     } catch (error) {
-      if (!(error instanceof APIError) || error.response.status !== 404) {
+      if (!(error instanceof APIError) || !hasMissingSnapshotStatus(error)) {
         throw error;
       }
     }
@@ -239,7 +248,12 @@ async function cleanupOldBaseArtifacts(
 
     await db
       .delete(sandboxBaseSnapshot)
-      .where(eq(sandboxBaseSnapshot.revision, stored.revision));
+      .where(
+        and(
+          eq(sandboxBaseSnapshot.revision, stored.revision),
+          eq(sandboxBaseSnapshot.snapshotId, stored.snapshotId),
+        ),
+      );
     console.log(
       JSON.stringify({
         event: "retired_base_artifact_deleted",
@@ -384,20 +398,45 @@ async function startWorker(sandbox: Sandbox): Promise<string> {
 export async function provisionAutopilotSandbox(
   input: AutopilotRunInput,
 ): Promise<{ workerUrl: string }> {
-  const { Sandbox } = await import("@vercel/sandbox");
+  const { APIError, Sandbox } = await import("@vercel/sandbox");
   try {
-    const baseSnapshotId = await getBaseSnapshotId(input.runId);
+    let baseSnapshotId = await getBaseSnapshotId(input.runId);
     await setProvisioningStage(input.runId, "creating_sandbox");
-    const sandbox = await Sandbox.getOrCreate({
-      ...getSandboxCredentials(),
-      env: getSandboxEnvironment(input),
-      name: input.sandboxName,
-      persistent: false,
-      ports: [SANDBOX_PORT],
-      resources: { vcpus: env.AUTOPILOT_SANDBOX_VCPUS },
-      source: { snapshotId: baseSnapshotId, type: "snapshot" },
-      timeout: SANDBOX_TIMEOUT_MS,
-    });
+    const createSandbox = (snapshotId: string) =>
+      Sandbox.getOrCreate({
+        ...getSandboxCredentials(),
+        env: getSandboxEnvironment(input),
+        name: input.sandboxName,
+        persistent: false,
+        ports: [SANDBOX_PORT],
+        resources: { vcpus: env.AUTOPILOT_SANDBOX_VCPUS },
+        source: { snapshotId, type: "snapshot" },
+        timeout: SANDBOX_TIMEOUT_MS,
+      });
+
+    let sandbox: Sandbox;
+    try {
+      sandbox = await createSandbox(baseSnapshotId);
+    } catch (error) {
+      if (!(error instanceof APIError) || !hasMissingSnapshotStatus(error)) {
+        throw error;
+      }
+
+      await db
+        .delete(sandboxBaseSnapshot)
+        .where(
+          and(
+            eq(sandboxBaseSnapshot.revision, getBaseSandboxName()),
+            eq(sandboxBaseSnapshot.snapshotId, baseSnapshotId),
+          ),
+        );
+      console.warn("Stored base snapshot was unavailable; rebuilding it", {
+        snapshotId: baseSnapshotId,
+      });
+      baseSnapshotId = await getBaseSnapshotId(input.runId);
+      await setProvisioningStage(input.runId, "creating_sandbox");
+      sandbox = await createSandbox(baseSnapshotId);
+    }
     await setProvisioningStage(input.runId, "starting_worker");
     const workerUrl = await startWorker(sandbox);
     await db
